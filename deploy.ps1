@@ -24,7 +24,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $appRoot = Join-Path $PSScriptRoot 'app'
 $remoteRoot = "/home/arduino/ArduinoApps/$AppName"
-$files = @('app.yaml', 'sketch/sketch.yaml', 'sketch/sketch.ino', 'python/main.py')
+$files = @('app.yaml', 'sketch/sketch.yaml', 'sketch/sketch.ino', 'sketch/ina219_monitor.h', 'python/main.py')
 
 function Invoke-Checked {
     param([string]$Executable, [string[]]$Arguments)

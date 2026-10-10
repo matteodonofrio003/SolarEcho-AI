@@ -15,6 +15,36 @@ La [guida Seeed del piezo](Grove-Piezo-Vibration-Sensor-wiki.md) contiene anche 
 
 ## Alimentazione e pannello
 
+### INA219 utilizzato per la prova elettrica
+
+Il team ha confermato un modulo **INA219 DC Current Monitor** collegato ai pin
+SDA/SCL, con shunt **R100 (0,1 ohm)**. La lettura usa `Wire`, distinta dal Qwiic
+`Wire1` del Modulino. Sono disponibili il [datasheet TI](INA219-datasheet.pdf)
+e la [procedura seriale](INA219_SERIALE.md). Il modello del breakout, i limiti
+dello shunt e il punto di inserzione nel circuito devono essere documentati.
+
+### Sensore di corrente da confermare sul banco
+
+L'inventario include **Grove - 2.5A DC Current Sensor (ACS70331)**. La
+[guida Seeed salvata](Grove-ACS70331-current-sensor-wiki.html) e la
+[fonte ufficiale](https://wiki.seeedstudio.com/Grove-2.5A-DC-Current-Sensor-ACS70331/)
+descrivono un modulo con uscita analogica, range 0..2,5 A e sensibilita tipica
+800 mV/A. L'offset va misurato a corrente realmente nulla: non effettuare
+automaticamente l'azzeramento mentre il pannello carica la batteria.
+
+Il modulo misura la corrente, non la tensione del pannello. Per ottenere
+potenza misurata serve acquisire anche la tensione sullo stesso ramo:
+`P_W = V_V * I_A`. La tensione nominale del pannello o della batteria non
+sostituisce questa misura. Seeed segnala errori significativi alle basse
+correnti e raccomanda correnti maggiori di 200 mA per i test di questo modulo.
+
+Prima del firmware vanno confermati modello fisico, alimentazione del sensore,
+pin di segnale verso UNO Q, punto e direzione della misura e presenza di un
+circuito per la lettura della tensione. Non assegnare pin o valori di partitore
+sulla base del solo nome dell'inventario. A0 e gia usato dal piezo.
+
+Questo ACS70331 non e il sensore INA219 confermato dal team per la prova attuale.
+
 | Componente | Documenti locali | Fonte originale | Stato |
 | --- | --- | --- | --- |
 | Batteria LiPo PLIB1000-2MM | [Scheda commerciale salvata](PLIB1000-2MM-battery-product.html) | [Open Electronics](https://www.open-electronics.org/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/) | La scheda indica 3,7 V, 1000 mAh e connettore passo 2 mm. Verificare fisicamente la polarita del connettore prima del caricatore. Non e un datasheet con limiti di carica/scarica. |

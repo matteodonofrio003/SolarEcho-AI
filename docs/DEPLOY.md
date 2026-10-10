@@ -61,9 +61,10 @@ SSH/SCP possono chiedere la password nel terminale e, al primo accesso, la confe
 | `app/app.yaml` | `/home/arduino/ArduinoApps/solarecho-ai/app.yaml` |
 | `app/sketch/sketch.yaml` | `/home/arduino/ArduinoApps/solarecho-ai/sketch/sketch.yaml` |
 | `app/sketch/sketch.ino` | `/home/arduino/ArduinoApps/solarecho-ai/sketch/sketch.ino` |
+| `app/sketch/ina219_monitor.h` | `/home/arduino/ArduinoApps/solarecho-ai/sketch/ina219_monitor.h` |
 | `app/python/main.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/main.py` |
 
-Il deploy ferma SolarEcho se e attiva, salva i quattro file precedenti in `.deploy-backups/<data_id>/` della stessa App e verifica il checksum SHA256 di ogni file trasferito prima di sostituirlo. Se un passaggio fallisce, l'App non viene riavviata; correggere l'errore e ripetere il deploy. I CSV nella cartella `data/` vengono conservati.
+Il deploy ferma SolarEcho se e attiva, salva i file precedenti dell'elenco in `.deploy-backups/<data_id>/` della stessa App e verifica il checksum SHA256 di ogni file trasferito prima di sostituirlo. Se un passaggio fallisce, l'App non viene riavviata; correggere l'errore e ripetere il deploy. I CSV nella cartella `data/` vengono conservati.
 
 La sincronizzazione avviene quando si esegue il comando. Dopo una modifica in questo repository il file non cambia automaticamente sulla scheda. Per evitare conflitti, usare il repository per modificare il codice e App Lab per eseguirlo e leggere i log. Eventuali nuove sorgenti richiedono l'aggiornamento dell'elenco `$files` nello script.
 

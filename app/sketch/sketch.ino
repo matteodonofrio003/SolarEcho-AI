@@ -1,10 +1,54 @@
 #include <Arduino_Modulino.h>
 #include <Arduino_RouterBridge.h>
 #include <stdio.h>
+#include "ina219_monitor.h"
 
 // Piezo analogico: A0 deve ricevere un segnale condizionato e protetto 0..3,3 V.
 // La sola resistenza da 1 Mohm in parallelo al piezo NON protegge l'ADC.
 ModulinoMovement movement;
+
+// Cablaggio confermato: INA219 sui pin SDA/SCL (Wire), shunt marcato R100.
+// Wire1 resta il bus Qwiic del Modulino. 0x40 richiede A0/A1 del chip a GND;
+// modificare l'indirizzo se i ponticelli del modulo sono configurati diversamente.
+constexpr uint8_t kIna219Address = 0x40;
+constexpr float kIna219ShuntOhms = 0.1f;
+Ina219Monitor powerMonitor(Wire, kIna219Address, kIna219ShuntOhms);
+
+void printPowerError(Ina219Monitor::Result result) {
+  switch (result) {
+    case Ina219Monitor::Result::I2C_ERROR:
+      Serial.print("POWER SENSOR ERROR: INA219 I2C su SDA/SCL (Wire), indirizzo 0x");
+      Serial.print(kIna219Address, HEX);
+      Serial.println("; controllare cablaggio e indirizzo.");
+      break;
+    case Ina219Monitor::Result::CONFIG_ERROR:
+      Serial.println("POWER SENSOR ERROR: configurazione INA219 non valida o registro non confermato.");
+      break;
+    case Ina219Monitor::Result::TIMEOUT:
+      Serial.println("POWER SENSOR ERROR: timeout conversione INA219.");
+      break;
+    case Ina219Monitor::Result::OUT_OF_RANGE:
+      Serial.println("POWER SENSOR ERROR: misura INA219 fuori range o saturata; corrente/potenza non valide.");
+      break;
+    default:
+      break;
+  }
+}
+
+void pollAndPrintPower() {
+  Ina219Monitor::Reading reading;
+  const Ina219Monitor::Result result = powerMonitor.poll(reading);
+  if (result == Ina219Monitor::Result::SAMPLE) {
+    char line[240];
+    snprintf(line, sizeof(line),
+             "POWER t_ms=%lu V_IN=%.3f V V_OUT=%.3f V SHUNT=%.3f mV I=%.2f mA P_IN=%.5f W P_OUT=%.5f W",
+             (unsigned long)reading.timestamp_ms, reading.source_v, reading.bus_v,
+             reading.shunt_mv, reading.current_ma, reading.input_power_w, reading.output_power_w);
+    Serial.println(line);
+  } else {
+    printPowerError(result);
+  }
+}
 
 constexpr uint32_t kPreTriggerUs = 200000UL;
 constexpr uint32_t kPostTriggerUs = 2000000UL;
@@ -123,6 +167,7 @@ bool readyForImpact() {
 }
 
 void beginImpactCapture() {
+  powerMonitor.cancel();  // Non riusare una lettura elettrica precedente all'impatto.
   ++captureId;
   sampleCount = 0;
   sendIndex = 0;
@@ -174,6 +219,10 @@ void setup() {
   Serial.begin(115200);  // Console/Serial Monitor di Arduino App Lab su UNO Q.
   Serial.println("SolarEcho: X/Y/Z in g; PIEZO_ADC su A0 a 14 bit; lockout=800 ms.");
   Serial.println("A0 richiede protezione hardware 0..3,3 V. Soglie ADC ON=512 OFF=256 da calibrare.");
+  Wire.begin();  // INA219 su SDA/D20 e SCL/D21; livelli logici a 3,3 V.
+  Serial.println("INA219: Wire/SDA/SCL, address=0x40, R_SHUNT=0.100 ohm (R100), stampa circa 1 Hz.");
+  Serial.println("POWER: V_IN su VIN+, V_OUT su VIN-; I positiva da VIN+ a VIN-. Posizione nel circuito da annotare.");
+  printPowerError(powerMonitor.begin());
   if (!sensorReady) Serial.println("SENSOR ERROR: Modulino Movement non inizializzato.");
   resumedAtMs = millis();
   Bridge.provide_safe("solarecho_arm", armCapture);
@@ -265,6 +314,8 @@ void loop() {
       Bridge.notify("solarecho_ready", captureId);
     }
     readyAnnounced = ready;
+    // Le transazioni INA219 e le stampe avvengono soltanto fuori dalla cattura.
+    pollAndPrintPower();
   }
 
   // Una sola riga seriale a 5 Hz. Nessuna stampa durante cattura e trasferimento.
