@@ -1,0 +1,20 @@
+{
+  "event_id": 26,
+  "expected_samples": 230,
+  "pretrigger_samples": 21,
+  "pretrigger_us": 200000,
+  "posttrigger_us": 2000000,
+  "trigger_adc": 16383,
+  "trigger_event_count": 28,
+  "session_id": "20261010_160045_2dd61bdf",
+  "transport_complete": true,
+  "capture_complete": true,
+  "unusable_reasons": [],
+  "received_samples": 230,
+  "declared_samples": 230,
+  "overflow": false,
+  "timed_out": false,
+  "additional_events": 0,
+  "mean_sample_rate_hz": 104.24751729302429,
+  "max_imu_gap_us": 10280
+}
