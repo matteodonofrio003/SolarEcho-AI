@@ -42,7 +42,7 @@ Per un eseguibile ADB in un'altra posizione:
 .\deploy.ps1 -Start
 ```
 
-`-Start` richiede che eventuali altre App siano ferme. Con lo script di acquisizione attuale l'avvio lancia una cattura di 6 secondi dopo l'attesa iniziale: preparare pannello e pallina prima di usarlo.
+`-Start` richiede che eventuali altre App siano ferme. La versione attuale attende READY e avvia una cattura a ogni impatto piezo: 200 ms precedenti e 2 s successivi. Preparare il cablaggio protetto prima di eseguirla e attendere il successivo READY fra impatti.
 
 ## Wi-Fi: alternativa tramite SSH
 

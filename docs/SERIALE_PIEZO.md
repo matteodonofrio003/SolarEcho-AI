@@ -19,7 +19,7 @@ Spegnere la scheda prima di modificare i collegamenti. Il Modulino resta sul Qwi
 - Soglia diagnostica ON = 512 e OFF = 256, circa 103 e 52 mV nominali. Sono valori iniziali **da calibrare sui dati reali**, non soglie di anomalia AI.
 - Un attraversamento della soglia ON incrementa RAW; per riarmare il rilevatore il valore deve tornare sotto OFF.
 - Lockout di 800 ms fra eventi accettati; ulteriori attraversamenti incrementano SUPPRESSED.
-- Il polling analogico viene sospeso durante il trasferimento dei campioni via Bridge. Gli impatti in questa fase possono essere persi.
+- Il polling analogico viene sospeso durante il trasferimento e l'attesa della conferma di salvataggio. Attendere sempre **READY** prima di un nuovo impatto.
 
 L'ingresso a zero non distingue un sensore scollegato da un sensore a riposo. Un ADC saturo puo indicare un segnale fuori scala, ma il software non puo proteggere il pin.
 
@@ -37,18 +37,19 @@ LIVE AX=0.0100 AY=-0.0200 AZ=0.9900 g | ADC=12 PEAK=780 ACTIVE=0 RAW=3 EVENTS=1 
 
 ## CSV
 
-La cattura manuale dura 6 secondi e salva un record per campione nuovo dell'IMU:
+La cattura parte automaticamente dal piezo quando il sistema e READY. Il buffer conserva 200 ms prima del trigger e acquisisce 2 s dopo. Salva un record per campione nuovo dell'IMU:
 
 ```text
-session_id,event_id,sample_index,timestamp_us,ax_g,ay_g,az_g,trigger_source,trigger_state,piezo_threshold_crossings,piezo_event_count,piezo_adc,piezo_peak_adc,piezo_timestamp_us,piezo_max_gap_us
+session_id,event_id,sample_index,timestamp_us,ax_g,ay_g,az_g,trigger_source,trigger_state,piezo_threshold_crossings,piezo_event_count,piezo_adc,piezo_peak_adc,piezo_timestamp_us,piezo_max_gap_us,capture_complete
 ```
 
-- `timestamp_us`: timestamp dell'accelerazione relativo all'inizio della finestra.
-- `piezo_timestamp_us`: timestamp dell'ultima lettura ADC, relativo allo stesso inizio.
+- `timestamp_us`: timestamp firmato dell'accelerazione relativo al trigger; negativo nei campioni precedenti.
+- `piezo_timestamp_us`: timestamp firmato dell'ultima lettura ADC, relativo allo stesso trigger.
 - `piezo_adc`: ultima lettura ADC; non necessariamente simultanea all'IMU.
 - `piezo_peak_adc`: massimo ADC osservato dall'ultimo record IMU (o dall'inizio della cattura).
 - `piezo_max_gap_us`: massimo intervallo fra letture ADC nello stesso periodo; zero se non ci sono ancora due letture.
-- `trigger_state`: stato del rilevatore con isteresi; la sorgente della finestra resta `manual_window`.
+- `trigger_state`: stato del rilevatore con isteresi; la sorgente e `piezo_analog`.
+- `capture_complete`: gate di qualita della finestra. Il JSON associato spiega eventuali esclusioni e indica ulteriori eventi nella finestra.
 
 Il CSV **non contiene tutti i campioni del polling ADC** e non e una forma d'onda piezo a 1 kHz. La forma d'onda principale resta l'accelerazione del Modulino. Per una forma d'onda piezo completa servira una cattura dedicata con tempi verificati.
 
@@ -57,10 +58,10 @@ Il CSV **non contiene tutti i campioni del polling ADC** e non e una forma d'ond
 1. Completare e verificare le protezioni hardware prima di caricare questa versione.
 2. Eseguire `deploy.ps1`, riaprire l'App e premere Run.
 3. A riposo misurare rumore ADC e picchi: i contatori devono restare stabili.
-4. Fare piccoli impatti controllati distanziati di almeno 2 s; confrontare cadute fisiche ed EVENTS.
+4. Fare piccoli impatti controllati **solo dopo READY**; confrontare cadute fisiche, EVENTS e numero di CSV salvati. Un evento accettato durante la cattura incrementa EVENTS senza creare una seconda finestra e rende la prima inutilizzabile per la baseline.
 5. Calibrare ON/OFF sopra il rumore; verificare rimbalzi e lockout. Controllare `piezo_max_gap_us` e saturazione nei CSV.
 
-Non sono ancora disponibili risultati sperimentali del piezo analogico. Le precedenti prove di compilazione/acquisizione con la versione digitale non validano questa versione.
+Il team ha fornito log reali della precedente diagnostica analogica: picchi a riposo nell'estratto fino a circa 121 ADC e impulsi da circa 3879 a 9768 ADC, con EVENTS arrivato a 6. Questi log confermano una separazione iniziale fra rumore e impulsi, ma non forniscono il numero indipendente degli impatti effettuati, le forme d'onda complete o la validazione delle protezioni. La nuova cattura automatica va verificata con CSV reali; i test software usano soltanto dati sintetici.
 
 ## Fonti
 

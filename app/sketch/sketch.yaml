@@ -1,10 +1,11 @@
 # Versioni recuperate dalla App gia funzionante sull'UNO Q del team.
-# Il core gestito da App Lab fornisce Arduino_RouterBridge.
+# Bridge esplicito: il profilo puo essere compilato anche con arduino-cli.
 profiles:
   default:
     platforms:
       - platform: arduino:zephyr
     libraries:
+      - Arduino_RouterBridge (0.4.3)
       - dependency: ArduinoGraphics (1.1.5)
       - dependency: Arduino_HS300x (1.0.1)
       - dependency: Arduino_LPS22HB (1.0.3)

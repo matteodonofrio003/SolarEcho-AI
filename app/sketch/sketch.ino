@@ -6,8 +6,11 @@
 // La sola resistenza da 1 Mohm in parallelo al piezo NON protegge l'ADC.
 ModulinoMovement movement;
 
-constexpr uint32_t kCaptureDurationUs = 6000000UL;
-constexpr size_t kMaxSamples = 768;  // 6 s a 104 Hz nominali, con margine.
+constexpr uint32_t kPreTriggerUs = 200000UL;
+constexpr uint32_t kPostTriggerUs = 2000000UL;
+constexpr size_t kPreSamples = 32;  // Circa 300 ms a 104 Hz; selezioniamo gli ultimi 200 ms.
+constexpr size_t kMaxSamples = 384;  // 2,2 s a 104 Hz, con margine.
+constexpr uint32_t kAckTimeoutMs = 15000;
 constexpr int kPiezoPin = A0;
 constexpr uint32_t kPiezoPeriodUs = 1000;  // Obiettivo di polling, non frequenza garantita.
 constexpr uint16_t kPiezoThresholdOn = 512;  // Soglie diagnostiche da calibrare sul montaggio.
@@ -29,10 +32,11 @@ uint32_t lastPiezoReadUs = 0;
 uint32_t piezoTimestampUs = 0;
 uint32_t piezoMaxGapUs = 0;
 
-void pollPiezo() {
+// true solo per un nuovo evento accettato dal lockout.
+bool pollPiezo() {
   const uint32_t nowUs = micros();
   const uint32_t gapUs = nowUs - lastPiezoReadUs;
-  if (havePiezoSample && gapUs < kPiezoPeriodUs) return;
+  if (havePiezoSample && gapUs < kPiezoPeriodUs) return false;
   if (havePiezoSample && gapUs > piezoMaxGapUs) piezoMaxGapUs = gapUs;
   lastPiezoReadUs = nowUs;
   piezoAdc = analogRead(kPiezoPin);
@@ -44,9 +48,9 @@ void pollPiezo() {
   // Isteresi: un nuovo fronte richiede prima il ritorno sotto la soglia OFF.
   if (piezoActive) {
     if (piezoAdc <= kPiezoThresholdOff) piezoActive = false;
-    return;
+    return false;
   }
-  if (piezoAdc < kPiezoThresholdOn) return;
+  if (piezoAdc < kPiezoThresholdOn) return false;
   piezoActive = true;
   ++piezoThresholdCrossings;
   const uint32_t nowMs = millis();
@@ -54,13 +58,15 @@ void pollPiezo() {
     ++piezoEvents;
     lastPiezoEventMs = nowMs;
     hasPiezoEvent = true;
+    return true;
   } else {
     ++piezoSuppressedCrossings;
   }
+  return false;
 }
 
 struct Sample {
-  uint32_t timestamp_us;  // Relativo all'inizio della cattura.
+  uint32_t timestamp_us;  // micros() assoluto; convertito in tempo firmato al trasferimento.
   float ax_g;
   float ay_g;
   float az_g;
@@ -74,10 +80,21 @@ struct Sample {
 };
 
 Sample samples[kMaxSamples];
+Sample preSamples[kPreSamples];
+size_t preHead = 0;
+size_t preCount = 0;
 size_t sampleCount = 0;
+size_t capturedPreCount = 0;
 size_t sendIndex = 0;
-uint32_t captureStartUs = 0;
+uint32_t triggerUs = 0;
+uint16_t triggerAdc = 0;
+uint32_t triggerEventCount = 0;
+uint32_t additionalEvents = 0;
+uint32_t waitAckSinceMs = 0;
+uint32_t resumedAtMs = 0;
 int captureId = 0;
+bool autoEnabled = false;  // Python arma dopo aver registrato i callback.
+bool readyAnnounced = false;
 bool sensorReady = false;
 bool overflow = false;
 bool haveAcceleration = false;
@@ -87,24 +104,61 @@ float latestZ = 0;
 uint32_t lastAccelerationMs = 0;
 uint32_t lastSerialMs = 0;
 
-enum class State { IDLE, CAPTURING, SENDING };
+enum class State { IDLE, CAPTURING, SENDING, WAIT_ACK };
 State state = State::IDLE;
 
-// provide_safe esegue questa funzione nel loop, evitando accessi concorrenti allo stato.
-// 1 = avviata; 0 = occupato; -1 = sensore non inizializzato.
-int startCapture(int requestedId) {
+int armCapture() {
   if (!sensorReady) return -1;
   if (state != State::IDLE) return 0;
+  autoEnabled = true;
+  return 1;
+}
 
-  captureId = requestedId;
+bool readyForImpact() {
+  if (!autoEnabled || !sensorReady || state != State::IDLE || !haveAcceleration) return false;
+  if (millis() - lastAccelerationMs >= 500 || preCount < 2 || piezoActive) return false;
+  if (hasPiezoEvent && millis() - lastPiezoEventMs < kPiezoLockoutMs) return false;
+  const size_t oldest = (preHead + kPreSamples - preCount) % kPreSamples;
+  return micros() - preSamples[oldest].timestamp_us >= kPreTriggerUs;
+}
+
+void beginImpactCapture() {
+  ++captureId;
   sampleCount = 0;
   sendIndex = 0;
   overflow = false;
-  captureStartUs = micros();
-  havePiezoSample = false;  // Nuovo timestamp ADC appartenente alla finestra.
-  piezoSamplePeak = 0;
-  piezoMaxGapUs = 0;
+  triggerUs = piezoTimestampUs;
+  triggerAdc = piezoAdc;
+  triggerEventCount = piezoEvents;
+  additionalEvents = 0;
+  const size_t oldest = (preHead + kPreSamples - preCount) % kPreSamples;
+  for (size_t i = 0; i < preCount; ++i) {
+    const Sample& s = preSamples[(oldest + i) % kPreSamples];
+    const uint32_t ageUs = triggerUs - s.timestamp_us;
+    if (ageUs > 0 && ageUs <= kPreTriggerUs) samples[sampleCount++] = s;
+  }
+  capturedPreCount = sampleCount;
+  readyAnnounced = false;
   state = State::CAPTURING;
+}
+
+void resumeMonitoring() {
+  preHead = 0;
+  preCount = 0;
+  haveAcceleration = false;
+  havePiezoSample = false;
+  piezoSamplePeak = 0;
+  piezoSerialPeak = 0;
+  piezoMaxGapUs = 0;
+  readyAnnounced = false;
+  resumedAtMs = millis();
+  state = State::IDLE;
+}
+
+// Non riutilizziamo il buffer finche Python non conferma il salvataggio.
+int acknowledgeCapture(int receivedId) {
+  if (state != State::WAIT_ACK || receivedId != captureId) return 0;
+  resumeMonitoring();
   return 1;
 }
 
@@ -121,15 +175,20 @@ void setup() {
   Serial.println("SolarEcho: X/Y/Z in g; PIEZO_ADC su A0 a 14 bit; lockout=800 ms.");
   Serial.println("A0 richiede protezione hardware 0..3,3 V. Soglie ADC ON=512 OFF=256 da calibrare.");
   if (!sensorReady) Serial.println("SENSOR ERROR: Modulino Movement non inizializzato.");
-  Bridge.provide_safe("solarecho_start_capture", startCapture);
+  resumedAtMs = millis();
+  Bridge.provide_safe("solarecho_arm", armCapture);
+  Bridge.provide_safe("solarecho_ack", acknowledgeCapture);
 }
 
 void loop() {
   // Il trasferimento RPC interrompe il monitoraggio: non simuliamo campioni mancanti.
-  if (state != State::SENDING) pollPiezo();
+  if (state == State::IDLE || state == State::CAPTURING) {
+    const bool wasReady = readyForImpact();
+    if (pollPiezo() && wasReady) beginImpactCapture();
+  }
 
   // Letture continue fuori dal trasferimento; i campioni della cattura restano in RAM.
-  if (sensorReady && state != State::SENDING) {
+  if (sensorReady && (state == State::IDLE || state == State::CAPTURING)) {
     // L'IMU segnala dati nuovi: non assumiamo che il loop equivalga a 104 Hz.
     if (movement.available() && movement.update()) {
       latestX = movement.getX();
@@ -137,17 +196,22 @@ void loop() {
       latestZ = movement.getZ();
       haveAcceleration = true;
       lastAccelerationMs = millis();
-      if (state == State::CAPTURING) {
-        const uint32_t elapsedUs = micros() - captureStartUs;
-        if (elapsedUs < kCaptureDurationUs) {
+      const uint32_t stampUs = micros();
+      const Sample current = {
+        stampUs, latestX, latestY, latestZ,
+        (uint8_t)piezoActive, piezoThresholdCrossings, piezoEvents,
+        piezoAdc, piezoSamplePeak, piezoTimestampUs, piezoMaxGapUs
+      };
+      piezoSamplePeak = 0;
+      piezoMaxGapUs = 0;
+      if (state == State::IDLE) {
+        preSamples[preHead] = current;
+        preHead = (preHead + 1) % kPreSamples;
+        if (preCount < kPreSamples) ++preCount;
+      } else if (state == State::CAPTURING) {
+        if (stampUs - triggerUs < kPostTriggerUs) {
           if (sampleCount < kMaxSamples) {
-            samples[sampleCount++] = {
-              elapsedUs, latestX, latestY, latestZ,
-              (uint8_t)piezoActive, piezoThresholdCrossings, piezoEvents,
-              piezoAdc, piezoSamplePeak, piezoTimestampUs - captureStartUs, piezoMaxGapUs
-            };
-            piezoSamplePeak = 0;
-            piezoMaxGapUs = 0;
+            samples[sampleCount++] = current;
           } else {
             overflow = true;
             state = State::SENDING;
@@ -158,29 +222,49 @@ void loop() {
   }
 
   if (state == State::CAPTURING) {
-    if (micros() - captureStartUs >= kCaptureDurationUs) {
+    if (micros() - triggerUs >= kPostTriggerUs) {
       state = State::SENDING;
     }
   }
 
   if (state == State::SENDING) {
     if (sendIndex == 0) {
-      Serial.println("Cattura terminata; trasferimento CSV. La stampa LIVE riprende dopo il trasferimento.");
-      Bridge.notify("solarecho_begin", captureId, (int)sampleCount);
+      additionalEvents = piezoEvents - triggerEventCount;
+      Serial.println("BUSY: cattura terminata; trasferimento e salvataggio CSV.");
+      Bridge.notify("solarecho_begin", captureId, (int)sampleCount,
+                    (int)capturedPreCount, kPreTriggerUs, kPostTriggerUs,
+                    triggerAdc, triggerEventCount);
     }
 
     if (sendIndex < sampleCount) {
       const Sample& s = samples[sendIndex];
       Bridge.notify("solarecho_sample", captureId, (int)sendIndex,
-                    s.timestamp_us, s.ax_g, s.ay_g, s.az_g,
+                    (int32_t)(s.timestamp_us - triggerUs), s.ax_g, s.ay_g, s.az_g,
                     s.piezo_state, s.piezo_threshold_crossings, s.piezo_event_count,
-                    s.piezo_adc, s.piezo_peak_adc, s.piezo_timestamp_us, s.piezo_max_gap_us);
+                    s.piezo_adc, s.piezo_peak_adc,
+                    (int32_t)(s.piezo_timestamp_us - triggerUs), s.piezo_max_gap_us);
       ++sendIndex;
       delay(5);  // Trasmissione separata dalla cattura; limita il burst RPC.
     } else {
-      Bridge.notify("solarecho_end", captureId, (int)sampleCount, overflow);
-      state = State::IDLE;
+      state = State::WAIT_ACK;
+      waitAckSinceMs = millis();
+      Bridge.notify("solarecho_end", captureId, (int)sampleCount, overflow, additionalEvents);
     }
+  }
+
+  if (state == State::WAIT_ACK && millis() - waitAckSinceMs >= kAckTimeoutMs) {
+    autoEnabled = false;
+    resumeMonitoring();
+    Serial.println("SENSOR ERROR: nessuna conferma CSV da Python; riavviare la App.");
+  }
+
+  if (state == State::IDLE) {
+    const bool ready = readyForImpact();
+    if (ready && !readyAnnounced) {
+      Serial.println("READY: far cadere una pallina; cattura automatica -200 ms / +2 s.");
+      Bridge.notify("solarecho_ready", captureId);
+    }
+    readyAnnounced = ready;
   }
 
   // Una sola riga seriale a 5 Hz. Nessuna stampa durante cattura e trasferimento.
@@ -193,8 +277,11 @@ void loop() {
                latestX, latestY, latestZ, (unsigned)piezoAdc, (unsigned)piezoSerialPeak,
                (unsigned)piezoActive, (unsigned long)piezoThresholdCrossings,
                (unsigned long)piezoEvents, (unsigned long)piezoSuppressedCrossings);
-    } else {
+    } else if (millis() - resumedAtMs >= 500) {
       snprintf(line, sizeof(line), "SENSOR ERROR: IMU senza dati | ADC=%u PEAK=%u EVENTS=%lu",
+               (unsigned)piezoAdc, (unsigned)piezoSerialPeak, (unsigned long)piezoEvents);
+    } else {
+      snprintf(line, sizeof(line), "WAIT: ripresa letture IMU | ADC=%u PEAK=%u EVENTS=%lu",
                (unsigned)piezoAdc, (unsigned)piezoSerialPeak, (unsigned long)piezoEvents);
     }
     Serial.println(line);
