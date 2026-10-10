@@ -68,8 +68,8 @@ Lo STM32 gestisce la lettura deterministica dei sensori e la cattura delle fines
 | Modulino Movement | Collegamento al Qwiic dell'UNO Q su `Wire1`, I2C4, 3,3 V. Indirizzo predefinito previsto `0x6A`. |
 | I/O UNO Q | GPIO e ADC dello STM32 operano a 3,3 V. Nessun segnale esterno superiore a 3,3 V deve raggiungere un ingresso analogico. |
 | ADC | A0-A5 disponibili; risoluzione configurabile fino a 14 bit, riferimento predefinito 3,3 V. |
-| Piezo Sensor | La natura del modulo deve essere verificata sul componente reale. Una uscita digitale puo essere usata come trigger; un disco piezo grezzo richiede rete di protezione e condizionamento prima dell'ADC. |
-| OLED Grove 0,96 | Il controller e l'indirizzo I2C devono essere verificati dalla serigrafia o dalla scansione del bus prima di selezionare la libreria. Il connettore Grove non coincide meccanicamente con Qwiic. |
+| Piezo Sensor | Il link nell'inventario identifica il Grove Piezo Vibration Sensor Seeed, con uscita digitale HIGH/LOW. Usarlo come trigger dopo verifica del modulo fisico e dei livelli a 3,3 V. Non usarlo come sorgente di forma d'onda analogica. |
+| OLED Grove 0,96 | Il link nell'inventario identifica la variante SSD1315. Verificare la serigrafia e l'indirizzo I2C del pezzo fisico. Il connettore Grove non coincide meccanicamente con Qwiic. |
 | Alimentazione MVP | UNO Q alimentato tramite USB-C 5 V / 3 A. L'eventuale alimentazione solare e un sottosistema separato fino a verifica del caricatore Waveshare e del pannello R1123. |
 
 ## 6. Requisiti funzionali
@@ -79,7 +79,7 @@ Lo STM32 gestisce la lettura deterministica dei sensori e la cattura delle fines
 | FR-01 | Il firmware deve inizializzare il Modulino Movement e dichiarare `SENSOR ERROR` se non risponde. | All'avvio viene registrato il risultato dell'inizializzazione; in caso di errore non viene eseguita inferenza. |
 | FR-02 | Il firmware deve campionare X, Y e Z con timestamp monotono. | Ogni campione valido contiene `timestamp_us`, `ax_g`, `ay_g`, `az_g`. |
 | FR-03 | Il sistema deve misurare e salvare la frequenza effettiva di campionamento. | Ogni sessione contiene frequenza media, minima e massima derivata dai timestamp. |
-| FR-04 | Il sistema deve identificare un impatto. | Il trigger puo provenire da piezo digitale, piezo analogico condizionato o soglia sul modulo dell'accelerazione. La sorgente deve essere salvata. |
+| FR-04 | Il sistema deve identificare un impatto. | Il trigger puo provenire dal Grove Piezo Vibration Sensor digitale o da una soglia sul modulo dell'accelerazione. La sorgente deve essere salvata. |
 | FR-05 | Un singolo impatto non deve essere conteggiato piu volte per rimbalzi e oscillazioni residue. | Dopo un evento e applicato un tempo di lockout configurabile; gli eventuali trigger durante il lockout sono registrati come soppressi. |
 | FR-06 | Per ogni impatto accettato il sistema deve salvare una finestra di campioni. | Ogni evento contiene un tratto pre-trigger e un tratto post-trigger configurabili. |
 | FR-07 | Il sistema deve consentire la raccolta esplicita di una baseline normale. | Gli eventi della baseline sono etichettati `normal` e associati a una configurazione meccanica nota. |
@@ -288,7 +288,7 @@ Per ciascuna sessione devono essere registrati operatore, data, configurazione m
 | Variabilita della caduta | Score dominato dalla forza dell'impatto. | Guida meccanica, pallina e altezza fisse; controllo di comparabilita tramite picco; ripetizioni. |
 | Sensore fissato in modo non ripetibile | Cambia la risposta senza modifica del pannello. | Fissaggio documentato, posizione marcata, nessuna rimozione tra baseline e prova. |
 | Rimbalzi | Piu conteggi per un solo impatto. | Lockout configurabile e analisi degli intervalli tra trigger. |
-| Tipo di piezo sconosciuto | Rischio elettrico o interpretazione errata. | Identificare modulo; usare il piezo digitale solo come trigger; proteggere ogni ingresso analogico. |
+| Piezo fisico diverso dal modello indicato nell'inventario o uscita non a 3,3 V | Rischio elettrico o interpretazione errata. | Verificare serigrafia e livello di uscita; usare il Grove Piezo digitale solo come trigger. |
 | Pochi dati | Modello instabile. | Stato esplicito baseline insufficiente; aumentare le prove; preferire modello a feature semplici. |
 | Alimentazione solare insufficiente | Riavvii o instabilita. | USB-C per la demo; sottosistema solare separato e verificato successivamente. |
 
@@ -310,4 +310,5 @@ L'MVP e pronto per una demo quando tutte le condizioni seguenti sono soddisfatte
 - `docs/UM.md` - Manuale locale Arduino UNO Q.
 - `docs/ABX00162-ABX00173-it-datasheet.pdf` - Datasheet locale Arduino UNO Q.
 - `docs/ABX00162-full-pinout.pdf` - Pinout locale Arduino UNO Q.
-- Documentazione ufficiale del Modulino Movement e del modello esatto di ogni Piezo Sensor, da aggiungere dopo identificazione dei componenti fisici.
+- [Indice dei componenti e della documentazione scaricata](COMPONENTI.md), inclusi Modulino Movement e Grove Piezo Vibration Sensor identificato dal link dell'inventario.
+- [Procedura della prima acquisizione](PRIMA_ACQUISIZIONE.md).

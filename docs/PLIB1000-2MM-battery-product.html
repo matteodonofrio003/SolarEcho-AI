@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="en-US" class="no-js" itemtype="https://schema.org/IndividualProduct" itemscope>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+	<script>
+window.oeConsenso = (function () {
+	var CHIAVE = 'oe_consenso_statistiche';
+	var CHIAVE_ID = 'oe_consenso_id';
+	var CHIAVE_QUANDO = 'oe_consenso_quando';
+	var MESI = 24;
+	var FORMA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+	var ascoltatori = [];
+
+	function leggi(k) {
+		/* Navigazione privata o memoria bloccata: null, e si richiede a ogni visita. */
+		try { return localStorage.getItem(k); } catch (e) { return null; }
+	}
+	function scrivi(k, v) {
+		try { localStorage.setItem(k, v); } catch (e) {}
+	}
+
+	/* La scelta com'e' scritta, scaduta o no: serve al registro per dire cosa
+	   c'era PRIMA di un cambio d'idea. */
+	function grezzo() {
+		var v = leggi(CHIAVE);
+		return (v === '1' || v === '0') ? v : null;
+	}
+
+	/* Scaduta dopo MESI dalla scelta (25/9/2026, registro dei consensi): oltre
+	   quella data la riga che la dimostra non c'e' piu', e una scelta senza
+	   prova vale come non data. Una scelta SENZA data e' di prima del registro:
+	   non scade, ma il banner la richiede (vedi daChiedere). */
+	function scaduta() {
+		var q = Date.parse(leggi(CHIAVE_QUANDO) || '');
+		if (!q) { return false; }
+		var fine = new Date(q);
+		fine.setMonth(fine.getMonth() + MESI);
+		return Date.now() > fine.getTime();
+	}
+
+	/* '1' | '0' | null. Il null e' "non ha ancora risposto", che vale NEGATO
+	   ovunque: la differenza fra "ha detto di no" e "non gliel'abbiamo ancora
+	   chiesto" serve solo a decidere se mostrare il banner. */
+	function stato() {
+		return scaduta() ? null : grezzo();
+	}
+	function concesso() { return stato() === '1'; }
+
+	function id() {
+		var v = leggi(CHIAVE_ID);
+		return (v && FORMA_ID.test(v)) ? v : null;
+	}
+
+	/* Il banner si mostra a chi non ha risposto, a chi ha una scelta scaduta,
+	   e a chi ha risposto PRIMA che esistesse il registro (scelta senza
+	   identificativo): quella scelta resta valida finche' non risponde di
+	   nuovo, ma non c'e' niente che la dimostri. */
+	function daChiedere() {
+		return stato() === null || id() === null;
+	}
+
+	/* Un UUID versione 4. crypto.randomUUID esiste solo su HTTPS e nei browser
+	   recenti; getRandomValues quasi ovunque; Math.random e' l'ultimo ripiego —
+	   debole come segreto, ma qui serve solo che non si ripeta. */
+	function nuovoId() {
+		var c = window.crypto;
+		if (c && typeof c.randomUUID === 'function') { return c.randomUUID(); }
+		var b = new Array(16), i;
+		if (c && c.getRandomValues) {
+			var u = new Uint8Array(16);
+			c.getRandomValues(u);
+			for (i = 0; i < 16; i++) { b[i] = u[i]; }
+		} else {
+			for (i = 0; i < 16; i++) { b[i] = Math.floor(Math.random() * 256); }
+		}
+		b[6] = (b[6] & 0x0f) | 0x40;
+		b[8] = (b[8] & 0x3f) | 0x80;
+		var h = '';
+		for (i = 0; i < 16; i++) {
+			h += (b[i] + 0x100).toString(16).slice(1);
+			if (i === 3 || i === 5 || i === 7 || i === 9) { h += '-'; }
+		}
+		return h;
+	}
+
+	function avvisa() {
+		var ok = concesso();
+		for (var i = 0; i < ascoltatori.length; i++) {
+			/* Un ascoltatore che esplode non deve zittire gli altri: se GA4
+			   fallisce, Sourcebuster deve comunque venire spento. */
+			try { ascoltatori[i](ok); } catch (e) {}
+		}
+	}
+
+	/* Si iscrive E riceve subito lo stato di adesso: chi ascolta non deve
+	   ricordarsi di leggere il valore iniziale per conto suo. */
+	function quando(fn) {
+		ascoltatori.push(fn);
+		try { fn(concesso()); } catch (e) {}
+	}
+
+	/* La scelta, con il suo identificativo e il suo momento. L'identificativo
+	   resta lo stesso nei cambi d'idea successivi: nel registro, le righe di un
+	   browser stanno sotto un nome solo, in fila.
+	   Dopo aver avvisato gli ascoltatori si lancia `oe-consenso-scelta` sul
+	   documento: lo ascolta il registro (consenso-registro.php). Se quel file
+	   manca, l'evento cade nel vuoto e il banner funziona uguale. */
+	function scegli(valore) {
+		var prima = grezzo();
+		var mio = id();
+		var nuovo = !mio;
+		if (nuovo) { mio = nuovoId(); }
+		scrivi(CHIAVE, valore);
+		scrivi(CHIAVE_ID, mio);
+		scrivi(CHIAVE_QUANDO, new Date().toISOString());
+		avvisa();
+		try {
+			document.dispatchEvent(new CustomEvent('oe-consenso-scelta', {
+				detail: { valore: valore, precedente: prima, id: mio, nuovo: nuovo }
+			}));
+		} catch (e) {}
+	}
+
+	/* Riapre il banner e, se c'e', mostra l'identificativo: e' quello che il
+	   visitatore puo' citarci per chiedere la prova del suo consenso. Riempito
+	   qui, nel browser: l'HTML in cache e' uguale per tutti. */
+	function apri() {
+		var banner = document.getElementById('oe-consenso');
+		if (!banner) { return; }
+		var riga = document.getElementById('oe-consenso-id');
+		var mio = id();
+		if (riga && mio) {
+			var codice = riga.querySelector('code');
+			if (codice) { codice.textContent = mio; }
+			riga.hidden = false;
+		}
+		banner.hidden = false;
+	}
+
+	return { chiave: CHIAVE, stato: stato, concesso: concesso, id: id, daChiedere: daChiedere, quando: quando, scegli: scegli, apri: apri };
+})();
+</script>
+		<meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){ dataLayer.push(arguments); }
+gtag('consent', 'default', {
+	'ad_storage': 'denied',
+	'ad_user_data': 'denied',
+	'ad_personalization': 'denied',
+	'analytics_storage': 'denied',
+	'wait_for_update': 500
+});
+gtag('set', 'ads_data_redaction', true);
+(function () {
+	/* La scelta gia' data, letta dal bus di consenso-cookie.php (stampato su
+	   questo stesso hook a priorita' 0, quindi qui c'e' gia'). Il `?:` non e'
+	   pignoleria: se un giorno quel file non venisse caricato, GA4 deve
+	   restare al suo default NEGATO, non esplodere e lasciare la pagina a
+	   meta'. */
+	var scelta = window.oeConsenso ? window.oeConsenso.stato() : null;
+	if (scelta !== null) {
+		gtag('consent', 'update', { 'analytics_storage': scelta === '1' ? 'granted' : 'denied' });
+	}
+})();
+</script>
+		
+	<!-- This site is optimized with the Yoast SEO plugin v28.6 - https://yoast.com/product/yoast-seo-wordpress/ -->
+	<title>Lithium Polymer Battery 3.7V 1000mAh 2mm Pitch</title>
+	<meta name="description" content="Rechargeable 3.7V 1000mAh lithium polymer battery with 2mm pitch connector. Ideal for portable electronics and DIY projects." />
+	<link rel="canonical" href="https://www.open-electronics.org/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/" />
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:type" content="article" />
+	<meta property="og:title" content="Lithium Polymer Battery 3.7V 1000mAh 2mm Pitch" />
+	<meta property="og:description" content="Rechargeable 3.7V 1000mAh lithium polymer battery with 2mm pitch connector. Ideal for portable electronics and DIY projects." />
+	<meta property="og:url" content="https://www.open-electronics.org/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/" />
+	<meta property="og:site_name" content="Open Electronics" />
+	<meta property="article:modified_time" content="2026-10-05T11:59:23+00:00" />
+	<meta property="og:image" content="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp" />
+	<meta property="og:image:width" content="600" />
+	<meta property="og:image:height" content="600" />
+	<meta property="og:image:type" content="image/jpeg" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https:\/\/schema.org","@graph":[{"@type":"WebPage","@id":"https:\/\/www.open-electronics.org\/product\/lithium-polymer-battery-3-7v-1000ma-2mm-pitch\/","url":"https:\/\/www.open-electronics.org\/product\/lithium-polymer-battery-3-7v-1000ma-2mm-pitch\/","name":"Lithium Polymer Battery 3.7V 1000mAh 2mm Pitch","isPartOf":{"@id":"https:\/\/www.open-electronics.org\/#website"},"primaryImageOfPage":{"@id":"https:\/\/www.open-electronics.org\/product\/lithium-polymer-battery-3-7v-1000ma-2mm-pitch\/#primaryimage"},"image":{"@id":"https:\/\/www.open-electronics.org\/product\/lithium-polymer-battery-3-7v-1000ma-2mm-pitch\/#primaryimage"},"thumbnailUrl":"https:\/\/www.open-electronics.org\/wp-content\/uploads\/2026\/08\/6374-PLIB1000-2MM.webp","datePublished":"2026-08-29T13:27:49+00:00","dateModified":"2026-10-05T11:59:23+00:00","description":"Rechargeable 3.7V 1000mAh lithium polymer battery with 2mm pitch connector. Ideal for portable electronics and DIY projects.","breadcrumb":{"@id":"https:\/\/www.open-electronics.org\/product\/lithium-polymer-battery-3-7v-1000ma-2mm-pitch\/#breadcrumb"},"inLanguage":"en-US","potentialAction":[{"@type":"ReadAction","target":["https:\/\/www.open-electronics.org\/product\/lithium-polymer-battery-3-7v-1000ma-2mm-pitch\/"]}]},{"@type":"ImageObject","inLanguage":"en-US","@id":"https:\/\/www.open-electronics.org\/product\/lithium-polymer-battery-3-7v-1000ma-2mm-pitch\/#primaryimage","url":"https:\/\/www.open-electronics.org\/wp-content\/uploads\/2026\/08\/6374-PLIB1000-2MM.webp","contentUrl":"https:\/\/www.open-electronics.org\/wp-content\/uploads\/2026\/08\/6374-PLIB1000-2MM.webp","width":600,"height":600},{"@type":"BreadcrumbList","@id":"https:\/\/www.open-electronics.org\/product\/lithium-polymer-battery-3-7v-1000ma-2mm-pitch\/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https:\/\/www.open-electronics.org\/"},{"@type":"ListItem","position":2,"name":"Shop","item":"https:\/\/www.open-electronics.org\/shop\/"},{"@type":"ListItem","position":3,"name":"Lithium Polymer Battery 3.7V 1000mA &#8211; 2mm Pitch"}]},{"@type":"WebSite","@id":"https:\/\/www.open-electronics.org\/#website","url":"https:\/\/www.open-electronics.org\/","name":"Open Electronics","description":"Open source hardware, projects and electronics","publisher":{"@id":"https:\/\/www.open-electronics.org\/#organization"},"potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https:\/\/www.open-electronics.org\/?s={search_term_string}"},"query-input":{"@type":"PropertyValueSpecification","valueRequired":true,"valueName":"search_term_string"}}],"inLanguage":"en-US"},{"@type":"Organization","@id":"https:\/\/www.open-electronics.org\/#organization","name":"Open Electronics","url":"https:\/\/www.open-electronics.org\/","logo":{"@type":"ImageObject","inLanguage":"en-US","@id":"https:\/\/www.open-electronics.org\/#\/schema\/logo\/image\/","url":"https:\/\/www.open-electronics.org\/wp-content\/uploads\/2026\/08\/logoOE600-e1497967017248.webp","contentUrl":"https:\/\/www.open-electronics.org\/wp-content\/uploads\/2026\/08\/logoOE600-e1497967017248.webp","width":450,"height":47,"caption":"Open Electronics"},"image":{"@id":"https:\/\/www.open-electronics.org\/#\/schema\/logo\/image\/"}}]}</script>
+	<!-- / Yoast SEO plugin. -->
+
+
+<link rel="alternate" type="application/rss+xml" title="Open Electronics &raquo; Feed" href="https://www.open-electronics.org/feed/" />
+<link rel="alternate" type="application/rss+xml" title="Open Electronics &raquo; Comments Feed" href="https://www.open-electronics.org/comments/feed/" />
+<script>
+gtag('js', new Date());
+gtag('config', 'G-6E0FM08BL8');
+/* ─────────────────────────────────────────────────────────────────────
+   GTAG.JS SI CARICA SOLO CON IL CONSENSO (26/9/2026).
+   Fino a oggi lo script di Google si caricava per tutti, e col default
+   «negato» mandava lo stesso a Google un segnale per pagina senza cookie
+   (`g/collect?gcs=G100`, il «Consent Mode avanzato»): dentro c'erano
+   l'indirizzo della pagina, i dati del browser e, come in ogni richiesta,
+   l'IP. La privacy promette «if you click Reject, or do not answer, none of
+   this happens»: adesso e' vero. Chi non ha risposto o ha rifiutato non
+   scarica lo script e Google non riceve niente; GA4 conta solo chi accetta,
+   e non modella piu' gli altri.
+   Il differimento (`oe_ga4_differito`: dopo `load` e un momento libero, o
+   al primo gesto) resta per chi arriva gia' col consenso dato; chi accetta
+   adesso ha appena fatto un gesto, e lo script parte subito.
+   Se `window.oeConsenso` manca (consenso-cookie.php non caricato), lo
+   script non parte: il default sicuro e' Google spento, non acceso.
+   ───────────────────────────────────────────────────────────────────── */
+(function () {
+	var DIFFERITO = false;
+	var partito = false;
+	var gesti = ['pointerdown', 'keydown', 'scroll', 'touchstart'];
+	function concesso() { return !!(window.oeConsenso && window.oeConsenso.concesso()); }
+	function carica() {
+		if (partito) { return; }
+		partito = true;
+		gesti.forEach(function (g) { window.removeEventListener(g, caricaSeConcesso, true); });
+		var s = document.createElement('script');
+		s.async = true;
+		s.src = 'https://www.googletagmanager.com/gtag/js?id=G-6E0FM08BL8';
+		document.head.appendChild(s);
+	}
+	function caricaSeConcesso() { if (concesso()) { carica(); } }
+	function differisci() {
+		gesti.forEach(function (g) { window.addEventListener(g, caricaSeConcesso, { capture: true, passive: true }); });
+		function dopoIlLoad() {
+			if (window.requestIdleCallback) { window.requestIdleCallback(caricaSeConcesso, { timeout: 2000 }); }
+			else { setTimeout(caricaSeConcesso, 1000); }
+		}
+		if (document.readyState === 'complete') { dopoIlLoad(); } else { window.addEventListener('load', dopoIlLoad); }
+	}
+	if (!window.oeConsenso) { return; }
+	var primo = true;
+	window.oeConsenso.quando(function (ok) {
+		var adesso = primo;
+		primo = false;
+		if (!ok) { return; }
+		if (adesso && DIFFERITO) { differisci(); } else { carica(); }
+	});
+})();
+</script>
+					<script>document.documentElement.classList.remove( 'no-js' );</script>
+			<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://www.open-electronics.org/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.open-electronics.org%2Fproduct%2Flithium-polymer-battery-3-7v-1000ma-2mm-pitch%2F" />
+<link rel="alternate" title="oEmbed (XML)" type="text/xml+oembed" href="https://www.open-electronics.org/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.open-electronics.org%2Fproduct%2Flithium-polymer-battery-3-7v-1000ma-2mm-pitch%2F&#038;format=xml" />
+<style id="oe-css-font">@font-face{font-family:Anton;font-style:normal;font-weight:400;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/1Ptgg87LROyAm3K9-C8QSw.woff2)format("woff2");unicode-range:U+100-2BA,U+2BD-2C5,U+2C7-2CC,U+2CE-2D7,U+2DD-2FF,U+304,U+308,U+329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}@font-face{font-family:Anton;font-style:normal;font-weight:400;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/1Ptgg87LROyAm3Kz-C8.woff2)format("woff2");unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:"Source Serif 4";font-style:italic;font-weight:400;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/vEFH2_tTDB4M7-auWDN0ahZJW1ge6NmXq2ZbF8zBfb98SUr0aX2AzA.woff2)format("woff2");unicode-range:U+100-2BA,U+2BD-2C5,U+2C7-2CC,U+2CE-2D7,U+2DD-2FF,U+304,U+308,U+329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}@font-face{font-family:"Source Serif 4";font-style:italic;font-weight:400;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/vEFH2_tTDB4M7-auWDN0ahZJW1ge6NmXq2ZbF8zBfb98SUr6aX0.woff2)format("woff2");unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:"Source Serif 4";font-style:normal;font-weight:400;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/vEFI2_tTDB4M7-auWDN0ahZJW1gV8tenXg.woff2)format("woff2");unicode-range:U+100-2BA,U+2BD-2C5,U+2C7-2CC,U+2CE-2D7,U+2DD-2FF,U+304,U+308,U+329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}@font-face{font-family:"Source Serif 4";font-style:normal;font-weight:400;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/vEFI2_tTDB4M7-auWDN0ahZJW1gb8tc.woff2)format("woff2");unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:"Source Serif 4";font-style:normal;font-weight:600;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/vEFI2_tTDB4M7-auWDN0ahZJW1gV8tenXg.woff2)format("woff2");unicode-range:U+100-2BA,U+2BD-2C5,U+2C7-2CC,U+2CE-2D7,U+2DD-2FF,U+304,U+308,U+329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}@font-face{font-family:"Source Serif 4";font-style:normal;font-weight:600;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/vEFI2_tTDB4M7-auWDN0ahZJW1gb8tc.woff2)format("woff2");unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:Inter;font-style:normal;font-weight:400;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/inter-400-subset.woff2)format("woff2");unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:Inter;font-style:normal;font-weight:600;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/inter-600-subset.woff2)format("woff2");unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:Inter;font-style:normal;font-weight:700;font-display:swap;src:url(https://www.open-electronics.org/wp-content/themes/openelectronics-verge/font/inter-700-subset.woff2)format("woff2");unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}</style>
+<style id="wp-img-auto-sizes-contain-inline-css">
+img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
+/*# sourceURL=wp-img-auto-sizes-contain-inline-css */
+</style>
+<style id="wp-emoji-styles-inline-css">
+
+	img.wp-smiley, img.emoji {
+		display: inline !important;
+		border: none !important;
+		box-shadow: none !important;
+		height: 1em !important;
+		width: 1em !important;
+		margin: 0 0.07em !important;
+		vertical-align: -0.1em !important;
+		background: none !important;
+		padding: 0 !important;
+	}
+/*# sourceURL=wp-emoji-styles-inline-css */
+</style>
+<style id="wp-block-library-inline-css">
+:root{--wp-block-synced-color:#7a00df;--wp-block-synced-color--rgb:122,0,223;--wp-bound-block-color:var(--wp-block-synced-color);--wp-editor-canvas-background:#ddd;--wp-admin-theme-color:#007cba;--wp-admin-theme-color--rgb:0,124,186;--wp-admin-theme-color-darker-10:#006ba1;--wp-admin-theme-color-darker-10--rgb:0,107,160.5;--wp-admin-theme-color-darker-20:#005a87;--wp-admin-theme-color-darker-20--rgb:0,90,135;--wp-admin-border-width-focus:2px}@media (min-resolution:192dpi){:root{--wp-admin-border-width-focus:1.5px}}.wp-element-button{cursor:pointer}:root .has-very-light-gray-background-color{background-color:#eee}:root .has-very-dark-gray-background-color{background-color:#313131}:root .has-very-light-gray-color{color:#eee}:root .has-very-dark-gray-color{color:#313131}:root .has-vivid-green-cyan-to-vivid-cyan-blue-gradient-background{background:linear-gradient(135deg,#00d084,#0693e3)}:root .has-purple-crush-gradient-background{background:linear-gradient(135deg,#34e2e4,#4721fb 50%,#ab1dfe)}:root .has-hazy-dawn-gradient-background{background:linear-gradient(135deg,#faaca8,#dad0ec)}:root .has-subdued-olive-gradient-background{background:linear-gradient(135deg,#fafae1,#67a671)}:root .has-atomic-cream-gradient-background{background:linear-gradient(135deg,#fdd79a,#004a59)}:root .has-nightshade-gradient-background{background:linear-gradient(135deg,#330968,#31cdcf)}:root .has-midnight-gradient-background{background:linear-gradient(135deg,#020381,#2874fc)}:root{--wp--preset--font-size--normal:16px;--wp--preset--font-size--huge:42px}.has-regular-font-size{font-size:1em}.has-larger-font-size{font-size:2.625em}.has-normal-font-size{font-size:var(--wp--preset--font-size--normal)}.has-huge-font-size{font-size:var(--wp--preset--font-size--huge)}:root .has-text-align-center{text-align:center}:root .has-text-align-left{text-align:left}:root .has-text-align-right{text-align:right}.has-fit-text{white-space:nowrap!important}#end-resizable-editor-section{display:none}.aligncenter{clear:both}.items-justified-left{justify-content:flex-start}.items-justified-center{justify-content:center}.items-justified-right{justify-content:flex-end}.items-justified-space-between{justify-content:space-between}.screen-reader-text{word-wrap:normal!important;border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;width:1px;word-break:normal!important}.screen-reader-text:focus{background-color:#ddd;clip-path:none;color:#444;display:block;font-size:1em;height:auto;left:5px;line-height:normal;padding:15px 23px 14px;text-decoration:none;top:5px;width:auto;z-index:100000}html :where(.has-border-color){border-style:solid}html :where([style^=border-color],[style*=";border-color"],[style*="; border-color"]){border-style:solid}html :where([style^=border-top-color],[style*=";border-top-color"],[style*="; border-top-color"]){border-top-style:solid}html :where([style^=border-right-color],[style*=";border-right-color"],[style*="; border-right-color"]){border-right-style:solid}html :where([style^=border-bottom-color],[style*=";border-bottom-color"],[style*="; border-bottom-color"]){border-bottom-style:solid}html :where([style^=border-left-color],[style*=";border-left-color"],[style*="; border-left-color"]){border-left-style:solid}html :where([style^=border-width],[style*=";border-width"],[style*="; border-width"]){border-style:solid}html :where([style^=border-top-width],[style*=";border-top-width"],[style*="; border-top-width"]){border-top-style:solid}html :where([style^=border-right-width],[style*=";border-right-width"],[style*="; border-right-width"]){border-right-style:solid}html :where([style^=border-bottom-width],[style*=";border-bottom-width"],[style*="; border-bottom-width"]){border-bottom-style:solid}html :where([style^=border-left-width],[style*=";border-left-width"],[style*="; border-left-width"]){border-left-style:solid}html :where(img[class*=wp-image-]){height:auto;max-width:100%}:where(figure){margin:0 0 1em}html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:var(--wp-admin--admin-bar--height,0px)}@media screen and (max-width:600px){html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:0px}}
+/*wp_block_styles_on_demand_placeholder:6aca124e575b2*/
+/*# sourceURL=wp-block-library-inline-css */
+</style>
+<style id="classic-theme-styles-inline-css">
+/*! This file is auto-generated */
+.wp-block-button__link{color:#fff;background-color:#32373c;border-radius:9999px;box-shadow:none;text-decoration:none;padding:calc(.667em + 2px) calc(1.333em + 2px);font-size:1.125em}.wp-block-file__button{background:#32373c;color:#fff;text-decoration:none}
+/*# sourceURL=/wp-includes/css/classic-themes.min.css */
+</style>
+<style id="wp-block-styles-placeholder-inline-css">
+:root { --wp-internal-comment: "Placeholder for wp_hoist_late_printed_styles() to replace with the block styles printed at wp_footer." }
+/*# sourceURL=wp-block-styles-placeholder-inline-css */
+</style>
+<style id="wp-global-styles-placeholder-inline-css">
+:root { --wp-internal-comment: "Placeholder for wp_hoist_late_printed_styles() to replace with the global-styles printed at wp_footer." }
+/*# sourceURL=wp-global-styles-placeholder-inline-css */
+</style>
+<link rel='stylesheet' id='photoswipe-css' href='https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/css/photoswipe/photoswipe.min.css?ver=11.2.0' media='all' />
+<link rel='stylesheet' id='photoswipe-default-skin-css' href='https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/css/photoswipe/default-skin/default-skin.min.css?ver=11.2.0' media='all' />
+<style id="woocommerce-inline-inline-css">
+.woocommerce form .form-row .required { visibility: visible; }
+/*# sourceURL=woocommerce-inline-inline-css */
+</style>
+<link rel='stylesheet' id='kadence-global-css' href='https://www.open-electronics.org/wp-content/themes/kadence/assets/css/global.min.css?ver=1.5.2' media='all' />
+<style id="kadence-global-inline-css">
+/* Kadence Base CSS */
+:root{--global-palette1:#15803D;--global-palette2:#0F5F2D;--global-palette3:#111827;--global-palette4:#1F2937;--global-palette5:#4B5563;--global-palette6:#6B7280;--global-palette7:#E7F3EB;--global-palette8:#F5FAF7;--global-palette9:#FFFFFF;--global-palette10:oklch(from var(--global-palette1) calc(l + 0.10 * (1 - l)) calc(c * 1.00) calc(h + 180) / 100%);--global-palette11:#15803D;--global-palette12:#1159af;--global-palette13:#b82105;--global-palette14:#f7630c;--global-palette15:#f5a524;--global-palette9rgb:255, 255, 255;--global-palette-highlight:var(--global-palette1);--global-palette-highlight-alt:var(--global-palette2);--global-palette-highlight-alt2:var(--global-palette9);--global-palette-btn-bg:var(--global-palette1);--global-palette-btn-bg-hover:var(--global-palette2);--global-palette-btn:var(--global-palette9);--global-palette-btn-hover:var(--global-palette9);--global-palette-btn-sec-bg:var(--global-palette7);--global-palette-btn-sec-bg-hover:var(--global-palette2);--global-palette-btn-sec:var(--global-palette3);--global-palette-btn-sec-hover:var(--global-palette9);--global-body-font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";--global-heading-font-family:inherit;--global-primary-nav-font-family:inherit;--global-fallback-font:sans-serif;--global-display-fallback-font:sans-serif;--global-content-width:1290px;--global-content-wide-width:calc(1290px + 230px);--global-content-narrow-width:842px;--global-content-edge-padding:1.5rem;--global-content-boxed-padding:2rem;--global-calc-content-width:calc(1290px - var(--global-content-edge-padding) - var(--global-content-edge-padding) );--wp--style--global--content-size:var(--global-calc-content-width);}.wp-site-blocks{--global-vw:calc( 100vw - ( 0.5 * var(--scrollbar-offset)));}body{background:var(--global-palette8);}body, input, select, optgroup, textarea{font-weight:400;font-size:17px;line-height:1.6;font-family:var(--global-body-font-family);color:var(--global-palette4);}.content-bg, body.content-style-unboxed .site{background:var(--global-palette9);}h1,h2,h3,h4,h5,h6{font-family:var(--global-heading-font-family);}h1{font-weight:700;font-size:32px;line-height:1.5;color:var(--global-palette3);}h2{font-weight:700;font-size:28px;line-height:1.5;color:var(--global-palette3);}h3{font-weight:700;font-size:24px;line-height:1.5;color:var(--global-palette3);}h4{font-weight:700;font-size:22px;line-height:1.5;color:var(--global-palette4);}h5{font-weight:700;font-size:20px;line-height:1.5;color:var(--global-palette4);}h6{font-weight:700;font-size:18px;line-height:1.5;color:var(--global-palette5);}.entry-hero .kadence-breadcrumbs{max-width:1290px;}.site-container, .site-header-row-layout-contained, .site-footer-row-layout-contained, .entry-hero-layout-contained, .comments-area, .alignfull > .wp-block-cover__inner-container, .alignwide > .wp-block-cover__inner-container{max-width:var(--global-content-width);}.content-width-narrow .content-container.site-container, .content-width-narrow .hero-container.site-container{max-width:var(--global-content-narrow-width);}@media all and (min-width: 1520px){.wp-site-blocks .content-container  .alignwide{margin-left:-115px;margin-right:-115px;width:unset;max-width:unset;}}@media all and (min-width: 1102px){.content-width-narrow .wp-site-blocks .content-container .alignwide{margin-left:-130px;margin-right:-130px;width:unset;max-width:unset;}}.content-style-boxed .wp-site-blocks .entry-content .alignwide{margin-left:calc( -1 * var( --global-content-boxed-padding ) );margin-right:calc( -1 * var( --global-content-boxed-padding ) );}.content-area{margin-top:5rem;margin-bottom:5rem;}@media all and (max-width: 1024px){.content-area{margin-top:3rem;margin-bottom:3rem;}}@media all and (max-width: 767px){.content-area{margin-top:2rem;margin-bottom:2rem;}}@media all and (max-width: 1024px){:root{--global-content-boxed-padding:2rem;}}@media all and (max-width: 767px){:root{--global-content-boxed-padding:1.5rem;}}.entry-content-wrap{padding:2rem;}@media all and (max-width: 1024px){.entry-content-wrap{padding:2rem;}}@media all and (max-width: 767px){.entry-content-wrap{padding:1.5rem;}}.entry.single-entry{box-shadow:0px 15px 15px -10px rgba(0,0,0,0.05);}.entry.loop-entry{box-shadow:0px 15px 15px -10px rgba(0,0,0,0.05);}.loop-entry .entry-content-wrap{padding:2rem;}@media all and (max-width: 1024px){.loop-entry .entry-content-wrap{padding:2rem;}}@media all and (max-width: 767px){.loop-entry .entry-content-wrap{padding:1.5rem;}}button, .button, .wp-block-button__link, input[type="button"], input[type="reset"], input[type="submit"], .fl-button, .elementor-button-wrapper .elementor-button, .wc-block-components-checkout-place-order-button, .wc-block-cart__submit{box-shadow:0px 0px 0px -7px rgba(0,0,0,0);}button:hover, button:focus, button:active, .button:hover, .button:focus, .button:active, .wp-block-button__link:hover, .wp-block-button__link:focus, .wp-block-button__link:active, input[type="button"]:hover, input[type="button"]:focus, input[type="button"]:active, input[type="reset"]:hover, input[type="reset"]:focus, input[type="reset"]:active, input[type="submit"]:hover, input[type="submit"]:focus, input[type="submit"]:active, .elementor-button-wrapper .elementor-button:hover, .elementor-button-wrapper .elementor-button:focus, .elementor-button-wrapper .elementor-button:active, .wc-block-cart__submit:hover{box-shadow:0px 15px 25px -7px rgba(0,0,0,0.1);}.kb-button.kb-btn-global-outline.kb-btn-global-inherit{padding-top:calc(px - 2px);padding-right:calc(px - 2px);padding-bottom:calc(px - 2px);padding-left:calc(px - 2px);}@media all and (min-width: 1025px){.transparent-header .entry-hero .entry-hero-container-inner{padding-top:80px;}}@media all and (max-width: 1024px){.mobile-transparent-header .entry-hero .entry-hero-container-inner{padding-top:80px;}}@media all and (max-width: 767px){.mobile-transparent-header .entry-hero .entry-hero-container-inner{padding-top:80px;}}.entry-author-style-center{padding-top:var(--global-md-spacing);border-top:1px solid var(--global-gray-500);}.entry-author-style-center .entry-author-avatar, .entry-meta .author-avatar{display:none;}.entry-author-style-normal .entry-author-profile{padding-left:0px;}#comments .comment-meta{margin-left:0px;}
+/* Kadence Header CSS */
+@media all and (max-width: 1024px){.mobile-transparent-header #masthead{position:absolute;left:0px;right:0px;z-index:100;}.kadence-scrollbar-fixer.mobile-transparent-header #masthead{right:var(--scrollbar-offset,0);}.mobile-transparent-header #masthead, .mobile-transparent-header .site-top-header-wrap .site-header-row-container-inner, .mobile-transparent-header .site-main-header-wrap .site-header-row-container-inner, .mobile-transparent-header .site-bottom-header-wrap .site-header-row-container-inner{background:transparent;}.site-header-row-tablet-layout-fullwidth, .site-header-row-tablet-layout-standard{padding:0px;}}@media all and (min-width: 1025px){.transparent-header #masthead{position:absolute;left:0px;right:0px;z-index:100;}.transparent-header.kadence-scrollbar-fixer #masthead{right:var(--scrollbar-offset,0);}.transparent-header #masthead, .transparent-header .site-top-header-wrap .site-header-row-container-inner, .transparent-header .site-main-header-wrap .site-header-row-container-inner, .transparent-header .site-bottom-header-wrap .site-header-row-container-inner{background:transparent;}}.site-branding a.brand img{max-width:200px;}.site-branding a.brand img.svg-logo-image{width:200px;}.site-branding{padding:0px 0px 0px 0px;}.site-branding .site-title{font-weight:700;font-size:26px;line-height:1.2;color:var(--global-palette3);}#masthead, #masthead .kadence-sticky-header.item-is-fixed:not(.item-at-start):not(.site-header-row-container):not(.site-main-header-wrap), #masthead .kadence-sticky-header.item-is-fixed:not(.item-at-start) > .site-header-row-container-inner{background:#ffffff;}.site-main-header-inner-wrap{min-height:80px;}.header-navigation[class*="header-navigation-style-underline"] .header-menu-container.primary-menu-container>ul>li>a:after{width:calc( 100% - 1.2em);}.main-navigation .primary-menu-container > ul > li.menu-item > a{padding-left:calc(1.2em / 2);padding-right:calc(1.2em / 2);padding-top:0.6em;padding-bottom:0.6em;color:var(--global-palette5);}.main-navigation .primary-menu-container > ul > li.menu-item .dropdown-nav-special-toggle{right:calc(1.2em / 2);}.main-navigation .primary-menu-container > ul > li.menu-item > a:hover{color:var(--global-palette-highlight);}.main-navigation .primary-menu-container > ul > li.menu-item.current-menu-item > a{color:var(--global-palette3);}.header-navigation .header-menu-container ul ul.sub-menu, .header-navigation .header-menu-container ul ul.submenu{background:var(--global-palette3);box-shadow:0px 2px 13px 0px rgba(0,0,0,0.1);}.header-navigation .header-menu-container ul ul li.menu-item, .header-menu-container ul.menu > li.kadence-menu-mega-enabled > ul > li.menu-item > a{border-bottom:1px solid rgba(255,255,255,0.1);border-radius:0px 0px 0px 0px;}.header-navigation .header-menu-container ul ul li.menu-item > a{width:200px;padding-top:1em;padding-bottom:1em;color:var(--global-palette8);font-size:12px;}.header-navigation .header-menu-container ul ul li.menu-item > a:hover{color:var(--global-palette9);background:var(--global-palette4);border-radius:0px 0px 0px 0px;}.header-navigation .header-menu-container ul ul li.menu-item.current-menu-item > a{color:var(--global-palette9);background:var(--global-palette4);border-radius:0px 0px 0px 0px;}.mobile-toggle-open-container .menu-toggle-open, .mobile-toggle-open-container .menu-toggle-open:focus{color:var(--global-palette5);padding:0.4em 0.6em 0.4em 0.6em;font-size:14px;}.mobile-toggle-open-container .menu-toggle-open.menu-toggle-style-bordered{border:1px solid currentColor;}.mobile-toggle-open-container .menu-toggle-open .menu-toggle-icon{font-size:20px;}.mobile-toggle-open-container .menu-toggle-open:hover, .mobile-toggle-open-container .menu-toggle-open:focus-visible{color:var(--global-palette-highlight);}.mobile-navigation ul li{font-size:14px;}.mobile-navigation ul li a{padding-top:1em;padding-bottom:1em;}.mobile-navigation ul li > a, .mobile-navigation ul li.menu-item-has-children > .drawer-nav-drop-wrap{color:var(--global-palette8);}.mobile-navigation ul li.current-menu-item > a, .mobile-navigation ul li.current-menu-item.menu-item-has-children > .drawer-nav-drop-wrap{color:var(--global-palette-highlight);}.mobile-navigation ul li.menu-item-has-children .drawer-nav-drop-wrap, .mobile-navigation ul li:not(.menu-item-has-children) a{border-bottom:1px solid rgba(255,255,255,0.1);}.mobile-navigation:not(.drawer-navigation-parent-toggle-true) ul li.menu-item-has-children .drawer-nav-drop-wrap button{border-left:1px solid rgba(255,255,255,0.1);}#mobile-drawer .drawer-header .drawer-toggle{padding:0.6em 0.15em 0.6em 0.15em;font-size:24px;}
+/* Kadence Footer CSS */
+.site-bottom-footer-inner-wrap{padding-top:30px;padding-bottom:30px;grid-column-gap:30px;}.site-bottom-footer-inner-wrap .widget{margin-bottom:30px;}.site-bottom-footer-inner-wrap .site-footer-section:not(:last-child):after{right:calc(-30px / 2);}
+/* Kadence Woo CSS */
+.entry-hero.product-hero-section .entry-header{min-height:200px;}.product-title .single-category{font-weight:700;font-size:32px;line-height:1.5;color:var(--global-palette3);}.wp-site-blocks .product-hero-section .extra-title{font-weight:700;font-size:32px;line-height:1.5;}.woocommerce ul.products.woo-archive-btn-button .product-action-wrap .button:not(.kb-button), .woocommerce ul.products li.woo-archive-btn-button .button:not(.kb-button), .wc-block-grid__product.woo-archive-btn-button .product-details .wc-block-grid__product-add-to-cart .wp-block-button__link{border:2px none transparent;box-shadow:0px 0px 0px 0px rgba(0,0,0,0.0);}.woocommerce ul.products.woo-archive-btn-button .product-action-wrap .button:not(.kb-button):hover, .woocommerce ul.products li.woo-archive-btn-button .button:not(.kb-button):hover, .wc-block-grid__product.woo-archive-btn-button .product-details .wc-block-grid__product-add-to-cart .wp-block-button__link:hover{box-shadow:0px 0px 0px 0px rgba(0,0,0,0);}
+/*# sourceURL=kadence-global-inline-css */
+</style>
+<link rel='stylesheet' id='kadence-header-css' href='https://www.open-electronics.org/wp-content/themes/kadence/assets/css/header.min.css?ver=1.5.2' media='all' />
+<link rel='stylesheet' id='kadence-content-css' href='https://www.open-electronics.org/wp-content/themes/kadence/assets/css/content.min.css?ver=1.5.2' media='all' />
+<link rel='stylesheet' id='oe-kadence-negozio-css' href='https://www.open-electronics.org/wp-content/themes/openelectronics-verge/kadence-negozio.min.css?ver=2a6341fb0e' media='all' />
+<link rel='stylesheet' id='kadence-footer-css' href='https://www.open-electronics.org/wp-content/themes/kadence/assets/css/footer.min.css?ver=1.5.2' media='all' />
+<link rel='stylesheet' id='oe-child-css' href='https://www.open-electronics.org/wp-content/themes/openelectronics-verge/style.min.css?ver=14f91b8fd1' media='all' />
+<link rel='stylesheet' id='oe-verge-css' href='https://www.open-electronics.org/wp-content/themes/openelectronics-verge/verge.min.css?ver=d71fd8415a' media='all' />
+<script id="jquery-core-js" src="https://www.open-electronics.org/wp-includes/js/jquery/jquery.min.js?ver=3.7.1"></script>
+<script id="jquery-migrate-js" src="https://www.open-electronics.org/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1"></script>
+<script data-wp-strategy="defer" defer id="wc-jquery-blockui-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/jquery-blockui/jquery.blockUI.min.js?ver=2.7.0-wc.11.2.0"></script>
+<script id="wc-add-to-cart-js-extra">
+var wc_add_to_cart_params = {"ajax_url":"/wp-admin/admin-ajax.php","wc_ajax_url":"/?wc-ajax=%%endpoint%%","i18n_view_cart":"View cart","cart_url":"https://www.open-electronics.org/cart/","is_cart":"","cart_redirect_after_add":"no"};
+//# sourceURL=wc-add-to-cart-js-extra
+</script>
+<script data-wp-strategy="defer" defer id="wc-add-to-cart-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/frontend/add-to-cart.min.js?ver=11.2.0"></script>
+<script data-wp-strategy="defer" defer id="wc-photoswipe-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/photoswipe/photoswipe.min.js?ver=4.1.1-wc.11.2.0"></script>
+<script data-wp-strategy="defer" defer id="wc-photoswipe-ui-default-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/photoswipe/photoswipe-ui-default.min.js?ver=4.1.1-wc.11.2.0"></script>
+<script id="wc-single-product-js-extra">
+var wc_single_product_params = {"i18n_required_rating_text":"Please select a rating","i18n_rating_options":["1 of 5 stars","2 of 5 stars","3 of 5 stars","4 of 5 stars","5 of 5 stars"],"i18n_product_gallery_trigger_text":"View full-screen image gallery","review_rating_required":"yes","flexslider":{"rtl":false,"animation":"slide","smoothHeight":true,"directionNav":false,"controlNav":"thumbnails","slideshow":false,"animationSpeed":500,"animationLoop":false,"allowOneSlide":false},"zoom_enabled":"","zoom_options":[],"photoswipe_enabled":"1","photoswipe_options":{"shareEl":false,"closeOnScroll":false,"history":false,"hideAnimationDuration":0,"showAnimationDuration":0},"flexslider_enabled":""};
+//# sourceURL=wc-single-product-js-extra
+</script>
+<script data-wp-strategy="defer" defer id="wc-single-product-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/frontend/single-product.min.js?ver=11.2.0"></script>
+<script data-wp-strategy="defer" defer id="wc-js-cookie-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/js-cookie/js.cookie.min.js?ver=2.1.4-wc.11.2.0"></script>
+<script id="woocommerce-js-extra">
+var woocommerce_params = {"ajax_url":"/wp-admin/admin-ajax.php","wc_ajax_url":"/?wc-ajax=%%endpoint%%","i18n_password_show":"Show password","i18n_password_hide":"Hide password"};
+//# sourceURL=woocommerce-js-extra
+</script>
+<script data-wp-strategy="defer" defer id="woocommerce-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/frontend/woocommerce.min.js?ver=11.2.0"></script>
+<script id="wc-cart-fragments-js-extra">
+var wc_cart_fragments_params = {"ajax_url":"/wp-admin/admin-ajax.php","wc_ajax_url":"/?wc-ajax=%%endpoint%%","cart_hash_key":"wc_cart_hash_613427898c20843e3fe405d828be3c81","fragment_name":"wc_fragments_613427898c20843e3fe405d828be3c81","request_timeout":"5000"};
+//# sourceURL=wc-cart-fragments-js-extra
+</script>
+<script data-wp-strategy="defer" defer id="wc-cart-fragments-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/frontend/cart-fragments.min.js?ver=11.2.0"></script>
+<link rel="https://api.w.org/" href="https://www.open-electronics.org/wp-json/" /><link rel="alternate" title="JSON" type="application/json" href="https://www.open-electronics.org/wp-json/wp/v2/product/43546" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://www.open-electronics.org/xmlrpc.php?rsd" />
+<meta name="generator" content="WordPress 7.1.3" />
+<meta name="generator" content="WooCommerce 11.2.0" />
+<link rel='shortlink' href='https://www.open-electronics.org/?p=43546' />
+	<noscript><style>.woocommerce-product-gallery{ opacity: 1 !important; }</style></noscript>
+	<link rel="icon" href="https://www.open-electronics.org/wp-content/uploads/2026/08/icona-sito-100x100.webp" sizes="32x32" />
+<link rel="icon" href="https://www.open-electronics.org/wp-content/uploads/2026/08/icona-sito-300x300.webp" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://www.open-electronics.org/wp-content/uploads/2026/08/icona-sito-300x300.webp" />
+<meta name="msapplication-TileImage" content="https://www.open-electronics.org/wp-content/uploads/2026/08/icona-sito-300x300.webp" />
+</head>
+
+<body class="wp-singular product-template-default single single-product postid-43546 wp-custom-logo wp-embed-responsive wp-theme-kadence wp-child-theme-openelectronics-verge theme-kadence woocommerce woocommerce-page woocommerce-no-js footer-on-bottom hide-focus-outline link-style-standard content-title-style-normal content-width-normal content-style-unboxed content-vertical-padding-show non-transparent-header mobile-non-transparent-header product-tab-style-normal product-variation-style-horizontal kadence-cart-button-normal">
+	<div class="oe-barra">
+		<div class="oe-contenitore">
+			<time datetime="2026-10-10">
+				Sat. Oct 10th, 2026</time>
+				<form role="search" method="get" class="oe-cerca oe-cerca--barra"
+	      action="https://www.open-electronics.org/">
+		<label class="screen-reader-text" for="cerca-barra">Search</label>
+				<span class="oe-cerca__campo">
+			<input id="cerca-barra" type="search" name="s"
+			       value="" autocomplete="off"
+			       placeholder="Search 4,719 products…">
+			<button type="submit" aria-label="Search">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+			</button>
+		</span>
+			<input type="hidden" name="post_type" value="product"></form>
+	<nav class="oe-social " aria-label="Social"><a href="https://www.facebook.com/OpenElectronics/" rel="noopener noreferrer nofollow" target="_blank" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a><a href="https://x.com/OpenElectronics" rel="noopener noreferrer nofollow" target="_blank" aria-label="X" title="X"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a><a href="https://www.instagram.com/open_electronics/" rel="noopener noreferrer nofollow" target="_blank" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a><a href="https://www.linkedin.com/company/openelectronics" rel="noopener noreferrer nofollow" target="_blank" aria-label="LinkedIn" title="LinkedIn"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a><a href="https://www.youtube.com/@OpenElectronicsOrg" rel="noopener noreferrer nofollow" target="_blank" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a><a href="https://t.me/openelectronics" rel="noopener noreferrer nofollow" target="_blank" aria-label="Telegram" title="Telegram"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg></a></nav>		</div>
+	</div>
+		<aside class="oe-avviso-it" hidden data-oe-paese="IT">
+		<div class="oe-contenitore oe-avviso-it__interno">
+			<span class="oe-avviso-it__bandiera" aria-hidden="true">🇮🇹</span>
+			<div class="oe-avviso-it__testo">
+				<p lang="it"><strong>Sei in Italia?</strong> Acquista su
+					<a href="https://www.futuranet.it/" rel="noopener">futuranet.it</a> &mdash;
+					stesso magazzino e stessi prodotti, con assistenza e fattura in
+					italiano e spedizione dall'Italia.</p>
+				<p lang="en"><strong>Shopping from Italy?</strong> Order from
+					<a href="https://www.futuranet.it/" rel="noopener">futuranet.it</a> &mdash;
+					same warehouse and same products, with Italian-language support,
+					invoicing and delivery.</p>
+			</div>
+			<a class="oe-avviso-it__vai" href="https://www.futuranet.it/" rel="noopener">
+				Vai a futuranet.it</a>
+			<button type="button" class="oe-avviso-it__chiudi" aria-label="Chiudi / Dismiss">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+			</button>
+		</div>
+	</aside>
+	<div id="wrapper" class="site wp-site-blocks">
+			<a class="skip-link screen-reader-text scroll-ignore" href="#main">Skip to content</a>
+		<header id="masthead" class="site-header" role="banner" itemtype="https://schema.org/WPHeader" itemscope>
+	<div id="main-header" class="site-header-wrap">
+		<div class="site-header-inner-wrap">
+			<div class="site-header-upper-wrap">
+				<div class="site-header-upper-inner-wrap">
+					<div class="site-main-header-wrap site-header-row-container site-header-focus-item site-header-row-layout-standard" data-section="kadence_customizer_header_main">
+	<div class="site-header-row-container-inner">
+				<div class="site-container">
+			<div class="site-main-header-inner-wrap site-header-row site-header-row-has-sides site-header-row-no-center">
+									<div class="site-header-main-section-left site-header-section site-header-section-left">
+						<div class="site-header-item site-header-focus-item" data-section="title_tagline">
+	<div class="site-branding branding-layout-standard"><a class="brand has-logo-image" href="https://www.open-electronics.org/" rel="home"><img width="450" height="47" src="https://www.open-electronics.org/wp-content/uploads/2026/08/logoOE600-e1497967017248.webp" class="custom-logo" alt="Open Electronics" decoding="async" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/logoOE600-e1497967017248.webp 450w, https://www.open-electronics.org/wp-content/uploads/2026/08/logoOE600-e1497967017248-300x31.webp 300w" sizes="(max-width: 450px) 100vw, 450px" /><div class="site-title-wrap"><p class="site-title">Open Electronics</p></div></a></div></div><!-- data-section="title_tagline" -->
+<div class="site-header-item oe-testata-cerca">	<form role="search" method="get" class="oe-cerca oe-cerca--testata"
+	      action="https://www.open-electronics.org/">
+		<label class="screen-reader-text" for="cerca-testata">Search</label>
+				<span class="oe-cerca__campo">
+			<input id="cerca-testata" type="search" name="s"
+			       value="" autocomplete="off"
+			       placeholder="Search 4,719 products…">
+			<button type="submit" aria-label="Search">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+			</button>
+		</span>
+			<input type="hidden" name="post_type" value="product"></form>
+	</div>					</div>
+																	<div class="site-header-main-section-right site-header-section site-header-section-right">
+						<div class="site-header-item site-header-focus-item site-header-item-main-navigation header-navigation-layout-stretch-false header-navigation-layout-fill-stretch-false" data-section="kadence_customizer_primary_navigation">
+		<nav id="site-navigation" class="main-navigation header-navigation hover-to-open nav--toggle-sub header-navigation-style-standard header-navigation-dropdown-animation-none" role="navigation" aria-label="Primary">
+			<div class="primary-menu-container header-menu-container">
+	<ul id="primary-menu" class="menu"></ul>		</div>
+	</nav><!-- #site-navigation -->
+		<div class="oe-testa-negozio">
+		<a class="oe-testa-account" href="https://www.open-electronics.org/my-account/">
+			<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+			     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+				<circle cx="12" cy="7" r="4"></circle>
+			</svg>
+			<span>Sign in</span>
+		</a>
+		<span class="oe-testa-carrello-guscio">	<a class="oe-testa-carrello"
+	   href="https://www.open-electronics.org/cart/"
+	   title="Cart">
+		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+		     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle>
+			<path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+		</svg>
+		<span class="oe-testa-carrello__n">0</span>
+				<span class="oe-testa-carrello__tot"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>0.00</span></span>
+	</a>
+	</span>
+	</div>
+	</div><!-- data-section="primary_navigation" -->
+					</div>
+							</div>
+		</div>
+	</div>
+</div>
+				</div>
+			</div>
+					</div>
+	</div>
+	
+<div id="mobile-header" class="site-mobile-header-wrap">
+	<div class="site-header-inner-wrap">
+		<div class="site-header-upper-wrap">
+			<div class="site-header-upper-inner-wrap">
+			<div class="site-main-header-wrap site-header-focus-item site-header-row-layout-standard site-header-row-tablet-layout-default site-header-row-mobile-layout-default ">
+	<div class="site-header-row-container-inner">
+		<div class="site-container">
+			<div class="site-main-header-inner-wrap site-header-row site-header-row-has-sides site-header-row-no-center">
+									<div class="site-header-main-section-left site-header-section site-header-section-left">
+						<div class="site-header-item site-header-focus-item" data-section="title_tagline">
+	<div class="site-branding mobile-site-branding branding-layout-standard branding-tablet-layout-inherit branding-mobile-layout-inherit"><a class="brand has-logo-image" href="https://www.open-electronics.org/" rel="home"><img width="450" height="47" src="https://www.open-electronics.org/wp-content/uploads/2026/08/logoOE600-e1497967017248.webp" class="custom-logo" alt="Open Electronics" decoding="async" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/logoOE600-e1497967017248.webp 450w, https://www.open-electronics.org/wp-content/uploads/2026/08/logoOE600-e1497967017248-300x31.webp 300w" sizes="(max-width: 450px) 100vw, 450px" /><div class="site-title-wrap"><div class="site-title vs-md-false">Open Electronics</div></div></a></div></div><!-- data-section="title_tagline" -->
+<div class="site-header-item oe-testata-cerca">	<form role="search" method="get" class="oe-cerca oe-cerca--testata"
+	      action="https://www.open-electronics.org/">
+		<label class="screen-reader-text" for="cerca-testata-tablet">Search</label>
+				<span class="oe-cerca__campo">
+			<input id="cerca-testata-tablet" type="search" name="s"
+			       value="" autocomplete="off"
+			       placeholder="Search 4,719 products…">
+			<button type="submit" aria-label="Search">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+			</button>
+		</span>
+			<input type="hidden" name="post_type" value="product"></form>
+	</div>					</div>
+																	<div class="site-header-main-section-right site-header-section site-header-section-right">
+						<div class="site-header-item site-header-focus-item site-header-item-navgation-popup-toggle" data-section="kadence_customizer_mobile_trigger">
+		<div class="mobile-toggle-open-container">
+						<button id="mobile-toggle" class="menu-toggle-open drawer-toggle menu-toggle-style-default" aria-label="Open menu" data-toggle-target="#mobile-drawer" data-toggle-body-class="showing-popup-drawer-from-right" aria-expanded="false" data-set-focus=".menu-toggle-close"
+					>
+						<span class="menu-toggle-icon"><span class="kadence-svg-iconset"><svg aria-hidden="true" class="kadence-svg-icon kadence-menu-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Toggle Menu</title><path d="M3 13h18c0.552 0 1-0.448 1-1s-0.448-1-1-1h-18c-0.552 0-1 0.448-1 1s0.448 1 1 1zM3 7h18c0.552 0 1-0.448 1-1s-0.448-1-1-1h-18c-0.552 0-1 0.448-1 1s0.448 1 1 1zM3 19h18c0.552 0 1-0.448 1-1s-0.448-1-1-1h-18c-0.552 0-1 0.448-1 1s0.448 1 1 1z"></path>
+				</svg></span></span>
+		</button>
+	</div>
+	</div><!-- data-section="mobile_trigger" -->
+					</div>
+							</div>
+		</div>
+	</div>
+</div>
+			</div>
+		</div>
+			</div>
+</div>
+</header><!-- #masthead -->
+
+	<main id="inner-wrap" class="wrap kt-clear" role="main">
+		
+		<nav class="oe-barra-negozio" aria-label="Shop">
+		<div class="oe-contenitore oe-barra-negozio__interno">
+
+						<a href="https://www.open-electronics.org/shop/">Shop</a>
+
+			<div class="oe-barra-negozio__tutte">
+				<button type="button" aria-expanded="false">Category
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+				</button>
+				<div class="oe-mega__pannello">
+					<div class="oe-contenitore">	<div class="oe-pannello oe-pannello--categorie">
+		<div class="oe-pannello__blocco oe-pannello__blocco--categorie">
+			<h2>Category <a href="https://www.open-electronics.org/shop/?orderby=menu_order">view all products</a></h2>
+			<p class="oe-pannello__scorciatoie"><span>Popular</span><a href="https://www.open-electronics.org/product-category/robotics-development/development-boards/arduino/">Arduino</a><a href="https://www.open-electronics.org/product-category/robotics-development/development-boards/raspberry-pi/">Raspberry Pi</a><a href="https://www.open-electronics.org/product-category/robotics-development/development-boards/esp8266-esp32/">ESP32 &amp; ESP8266</a><a href="https://www.open-electronics.org/product-category/robotics-development/development-boards/microbit/">micro:bit</a><a href="https://www.open-electronics.org/product-category/robotics-development/robotics/sensor/">Sensors</a><a href="https://www.open-electronics.org/product-category/instruments-tools/instrumentation/">Test &amp; measurement</a><a href="https://www.open-electronics.org/product-category/instruments-tools/3d-printers/">3D printing</a><a href="https://www.open-electronics.org/product-category/instruments-tools/laboratory/soldering/">Soldering</a></p>			<ul class="oe-pannello__categorie" style="columns:4"><li class=""><a href="https://www.open-electronics.org/product-category/alternative-energy/">Alternative energy<span>138</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/batteries-power/">Batteries &amp; power<span>984</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/cables-and-connectors/">Cables &amp; connectors<span>1556</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/components-enclosures/">Components &amp; enclosures<span>3939</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/electrical-lighting/">Electrical &amp; lighting<span>834</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/home-vehicles-leisure/">Home, vehicles &amp; leisure<span>961</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/instruments-tools/">Instruments &amp; tools<span>2430</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/light-effects-audio/">Light effects &amp; audio<span>827</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/outlet/">Outlet<span>12</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/remote-control/">Remote control<span>162</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/robotics-development/">Robotics &amp; development<span>2791</span></a></li><li class=""><a href="https://www.open-electronics.org/product-category/security-surveillance/">Security &amp; surveillance<span>764</span></a></li><li class="oe-pannello__fuori"><a href="https://www.open-electronics.org/product-category/discontinued-product/">Discontinued Product<span>22</span></a></li></ul>		</div>
+	</div>
+	</div>
+				</div>
+			</div>
+
+			<a href="https://www.open-electronics.org/shop/?orderby=date">New products</a>
+
+						<a class="oe-barra-negozio__via" href="https://www.open-electronics.org/">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+				<span class="oe-barra-negozio__lungo">Back to the blog</span><span class="oe-barra-negozio__corto">Blog</span></a>
+
+		</div>
+	</nav>
+	<div id="primary" class="content-area"><div class="content-container site-container"><main id="main" class="site-main" role="main">
+					
+			<div class="woocommerce-notices-wrapper"></div><div class="product-title product-above"><nav id="kadence-breadcrumbs" aria-label="Breadcrumbs"  class="kadence-breadcrumbs"><div class="kadence-breadcrumb-container"><span><a href="https://www.open-electronics.org/" itemprop="url" class="kadence-bc-home" ><span>Home</span></a></span> <span class="bc-delimiter">/</span> <span><a href="https://www.open-electronics.org/shop/" itemprop="url" ><span>Shop</span></a></span> <span class="bc-delimiter">/</span> <span><a href="https://www.open-electronics.org/product-category/batteries-power/" itemprop="url" ><span>Batteries &amp; power</span></a></span> <span class="bc-delimiter">/</span> <span><a href="https://www.open-electronics.org/product-category/batteries-power/batteries-chargers/" itemprop="url" ><span>Batteries &amp; chargers</span></a></span> <span class="bc-delimiter">/</span> <span><a href="https://www.open-electronics.org/product-category/batteries-power/batteries-chargers/rechargeable-batteries/" itemprop="url" ><span>Rechargeable batteries</span></a></span> <span class="bc-delimiter">/</span> <span class="kadence-bread-current">Lithium Polymer Battery 3.7V 1000mA &#8211; 2mm Pitch</span></div></nav></div><div id="product-43546" class="oe-prodotto oe-prodotto--disponibile entry content-bg entry-content-wrap product type-product post-43546 status-publish first instock product_cat-rechargeable-batteries product_tag-jst product_tag-lipo has-post-thumbnail taxable shipping-taxable purchasable product-type-simple">
+
+	
+		<header class="oe-prodotto__testa">
+		
+		<h1 class="product_title entry-title">Lithium Polymer Battery 3.7V 1000mA &#8211; 2mm Pitch</h1>
+
+					<div class="oe-prodotto__sommario">Rechargeable lithium polymer battery 3.7 V / 1000 mAh</div>
+			</header>
+
+		<div class="oe-prodotto__corpo">
+			<div class="woocommerce-product-gallery images oe-galleria woocommerce-product-gallery--with-images oe-galleria--sotto"
+	     data-oe-galleria
+	     style="--oe-gal-ar:1;--oe-gal-h:420px">
+		<div class="oe-galleria__scena">
+			<div class="oe-galleria__telaio">
+								<div class="woocommerce-product-gallery__wrapper oe-galleria__pista"
+				     role="group" aria-label="Product photos"
+				     tabindex="0">
+					<div data-thumb="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-100x100.webp" data-thumb-alt="Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch - Image 1" data-thumb-srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-300x300.webp 300w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-460x460.webp 460w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp 600w"  data-thumb-sizes="(max-width: 100px) 100vw, 100px" class="woocommerce-product-gallery__image"><a href="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp"><img width="600" height="600" src="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp" class="wp-post-image" alt="Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch - Image 1" data-caption="" data-src="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp" data-large_image="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp" data-large_image_width="600" data-large_image_height="600" decoding="async" fetchpriority="high" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp 600w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-300x300.webp 300w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-460x460.webp 460w" sizes="(max-width: 600px) 100vw, 600px" /></a></div><div data-thumb="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2-100x100.webp" data-thumb-alt="Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch - Image 3" data-thumb-srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2-300x300.webp 300w"  data-thumb-sizes="(max-width: 100px) 100vw, 100px" class="woocommerce-product-gallery__image"><a href="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2.webp"><img width="500" height="389" src="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2.webp" class="" alt="Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch - Image 3" data-caption="" data-src="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2.webp" data-large_image="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2.webp" data-large_image_width="500" data-large_image_height="389" decoding="async" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2.webp 500w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2-300x233.webp 300w" sizes="(max-width: 500px) 100vw, 500px" /></a></div><div data-thumb="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore-100x100.webp" data-thumb-alt="Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch - Image 4" data-thumb-srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore-300x300.webp 300w"  data-thumb-sizes="(max-width: 100px) 100vw, 100px" class="woocommerce-product-gallery__image"><a href="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore.webp"><img width="500" height="375" src="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore.webp" class="" alt="Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch - Image 4" data-caption="" data-src="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore.webp" data-large_image="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore.webp" data-large_image_width="500" data-large_image_height="375" decoding="async" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore.webp 500w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore-300x225.webp 300w" sizes="(max-width: 500px) 100vw, 500px" /></a></div>				</div>
+				<button type="button" class="oe-galleria__freccia oe-galleria__freccia--prec" data-oe-verso="-1" aria-label="Previous photo"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15.4 4.6 8 12l7.4 7.4 1.4-1.4L10.8 12l6-6z"/></svg></button><button type="button" class="oe-galleria__freccia oe-galleria__freccia--succ" data-oe-verso="1" aria-label="Next photo"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8.6 4.6 7.2 6l6 6-6 6 1.4 1.4L16 12z"/></svg></button>			</div>
+
+											<div class="oe-galleria__nastro">
+										<button type="button" class="oe-striscia__freccia oe-striscia__freccia--prec" data-oe-striscia="-1" aria-label="Scroll thumbnails back" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15.4 4.6 8 12l7.4 7.4 1.4-1.4L10.8 12l6-6z"/></svg></button>					<ol class="oe-galleria__strip" aria-label="Choose a photo">
+													<li>
+								<button type="button" class="oe-galleria__mini is-attiva"
+								        data-oe-foto="0"
+								        aria-label="Photo 1 of 3"
+								        aria-current="true">
+									<img width="600" height="600" src="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp" class="attachment-gallery_thumbnail size-gallery_thumbnail" alt="" loading="lazy" decoding="async" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp 600w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-300x300.webp 300w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM-460x460.webp 460w" sizes="auto, (max-width: 600px) 100vw, 600px" />								</button>
+							</li>
+													<li>
+								<button type="button" class="oe-galleria__mini"
+								        data-oe-foto="1"
+								        aria-label="Photo 2 of 3"
+								        >
+									<img width="500" height="389" src="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2.webp" class="attachment-gallery_thumbnail size-gallery_thumbnail" alt="" loading="lazy" decoding="async" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2.webp 500w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore2-300x233.webp 300w" sizes="auto, (max-width: 500px) 100vw, 500px" />								</button>
+							</li>
+													<li>
+								<button type="button" class="oe-galleria__mini"
+								        data-oe-foto="2"
+								        aria-label="Photo 3 of 3"
+								        >
+									<img width="500" height="375" src="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore.webp" class="attachment-gallery_thumbnail size-gallery_thumbnail" alt="" loading="lazy" decoding="async" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore.webp 500w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-PLIB2000_connettore-300x225.webp 300w" sizes="auto, (max-width: 500px) 100vw, 500px" />								</button>
+							</li>
+											</ol>
+					<button type="button" class="oe-striscia__freccia oe-striscia__freccia--succ" data-oe-striscia="1" aria-label="Scroll thumbnails forward" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8.6 4.6 7.2 6l6 6-6 6 1.4 1.4L16 12z"/></svg></button>				</div>
+					</div>
+	</div>
+	
+		<p class="oe-prodotto__identita"><span class="oe-identita__sku">SKU 6374-PLIB1000-2MM</span><span>EAN 8219671108904</span><span>Format: Rectangular</span><span>Pin pitch: 2 mm</span><span>Output voltage: 3.7 Vdc</span><span class="oe-identita__cat"><a href="https://www.open-electronics.org/product-category/batteries-power/batteries-chargers/rechargeable-batteries/" rel="tag">Rechargeable batteries</a></span></p>
+									<section class="oe-blocco oe-blocco--descrizione entry-content" id="description">
+				<h2 class="oe-titolo-sezione">Description</h2>
+								<table style="width: 100%" border="0" cellspacing="1" cellpadding="1">
+<tbody>
+<tr>
+<td><span style="font-size: 14px"><span style="font-family: arial,helvetica,sans-serif">Rechargeable lithium polymer battery 3.7 V / 1000 mAh. Connector: 2 mm pin pitch, cable length: 5 cm, dimensions (mm): 53x34x5.6, weight: 30 grams. </span></span></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td><span style="font-size: 14px"><span style="font-family: arial,helvetica,sans-serif"><strong>Warning! </strong>check that the battery connector polarity matches that of your device.</span></span></td>
+</tr>
+</tbody>
+</table>
+			</section>
+		
+			<section class="oe-blocco oe-blocco--specifiche" id="specifications">
+		<h2 class="oe-titolo-sezione">Technical details</h2>
+		<table class="oe-specifiche">
+			<tbody>
+							<tr>
+					<th scope="row">Connector</th>
+					<td>2 mm pin pitch</td>
+				</tr>
+							<tr>
+					<th scope="row">cable length</th>
+					<td>5 cm</td>
+				</tr>
+							<tr>
+					<th scope="row">dimensions (mm)</th>
+					<td>53x34x5.6</td>
+				</tr>
+							<tr>
+					<th scope="row">weight</th>
+					<td>30 grams</td>
+				</tr>
+						</tbody>
+		</table>
+			</section>
+		</div>
+
+		<aside class="oe-prodotto__colonna">
+		<div class="oe-colonna__interno">
+			<div class="oe-acquisto">
+				<div class="summary entry-summary">
+					<p class="price"><span class="oe-prezzo2"><span class="oe-prezzo2__voce oe-prezzo2__voce--netto"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>5.66</span></span><span class="oe-prezzo2__nota">excl. VAT</span></span><span class="oe-prezzo2__voce oe-prezzo2__voce--lordo"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>6.90</span></span><span class="oe-prezzo2__nota">incl. VAT</span></span></span></p>
+<p class="oe-nota-iva">VAT shown at the rate applied in Italy. The final VAT is calculated at checkout from your delivery address.</p>	<div class="oe-sconti">
+		<h2 class="oe-sconti__titolo">Quantity discounts</h2>
+		<table class="oe-sconti__tavola">
+			<tbody>
+							<tr>
+					<th scope="row">5 or more</th>
+					<td><span class="oe-prezzo2"><span class="oe-prezzo2__voce oe-prezzo2__voce--netto"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>5.09</span></span><span class="oe-prezzo2__nota">excl. VAT</span></span><span class="oe-prezzo2__voce oe-prezzo2__voce--lordo"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>6.21</span></span><span class="oe-prezzo2__nota">incl. VAT</span></span></span></td>
+				</tr>
+						</tbody>
+		</table>
+	</div>
+	<p class="stock in-stock">In stock</p>
+
+	
+	<form class="cart" action="https://www.open-electronics.org/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/" method="post" enctype='multipart/form-data'>
+		
+		<div class="quantity">
+		<label class="screen-reader-text" for="quantity_6aca124e68d63">Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch quantity</label>
+	<input
+		type="number"
+				id="quantity_6aca124e68d63"
+		class="input-text qty text"
+		name="quantity"
+		value="1"
+		aria-label="Product quantity"
+				min="1"
+							step="1"
+			placeholder=""
+			inputmode="numeric"
+			autocomplete="off"
+			/>
+	</div>
+
+		<button type="submit" name="add-to-cart" value="43546" class="single_add_to_cart_button button alt">Add to cart</button>
+
+			</form>
+
+	
+				</div>
+			</div>
+
+					</div>
+	</aside>
+
+		<div class="oe-prodotto__fondo">
+				
+	<section class="related products">
+
+					<h2>Related products</h2>
+				<ul class="products content-wrap product-archive grid-cols grid-ss-col-2 grid-sm-col-3 grid-lg-col-4 woo-archive-action-on-hover woo-archive-btn-text  woo-archive-image-hover-none">
+			
+					<li class="entry content-bg loop-entry product type-product post-43149 status-publish first instock product_cat-battery-charger product_tag-cn3791 product_tag-lipo product_tag-mppt product_tag-solar has-post-thumbnail taxable shipping-taxable purchasable product-type-simple">
+	<a href="https://www.open-electronics.org/product/mppt-charger-for-lipo-batteries/" class="woocommerce-loop-image-link woocommerce-LoopProduct-link woocommerce-loop-product__link"><img width="300" height="300" src="https://www.open-electronics.org/wp-content/uploads/2026/08/3085-LIPOSOLAR-300x300.webp" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="MPPT Charger for LiPo Batteries" decoding="async" loading="lazy" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/3085-LIPOSOLAR-300x300.webp 300w, https://www.open-electronics.org/wp-content/uploads/2026/08/3085-LIPOSOLAR-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/3085-LIPOSOLAR-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/3085-LIPOSOLAR-460x460.webp 460w, https://www.open-electronics.org/wp-content/uploads/2026/08/3085-LIPOSOLAR.webp 600w" sizes="auto, (max-width: 300px) 100vw, 300px" /></a><span class="oe-etichette"><span class="oe-etichetta">Battery chargers</span></span><div class="product-details content-bg entry-content-wrap"><h2 class="woocommerce-loop-product__title"><a href="https://www.open-electronics.org/product/mppt-charger-for-lipo-batteries/" class="woocommerce-LoopProduct-link-title woocommerce-loop-product__title_ink">MPPT Charger for LiPo Batteries</a></h2><div class="oe-scheda__sku"><span class="oe-scheda__sku-nome">SKU</span> 3085-LIPOSOLAR</div>
+	<span class="price"><span class="oe-prezzo2"><span class="oe-prezzo2__voce oe-prezzo2__voce--netto"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>6.15</span></span><span class="oe-prezzo2__nota">excl. VAT</span></span><span class="oe-prezzo2__voce oe-prezzo2__voce--lordo"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>7.50</span></span><span class="oe-prezzo2__nota">incl. VAT</span></span></span></span>
+<div class="product-action-wrap"><a href="/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/?add-to-cart=43149" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="43149" data-product_sku="3085-LIPOSOLAR" aria-label="Add to cart: &ldquo;MPPT Charger for LiPo Batteries&rdquo;" rel="nofollow" data-success_message="&ldquo;MPPT Charger for LiPo Batteries&rdquo; has been added to your cart" role="button">Add to cart<span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-right-alt-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="27" height="28" viewBox="0 0 27 28"><title>Continue</title><path d="M27 13.953c0 0.141-0.063 0.281-0.156 0.375l-6 5.531c-0.156 0.141-0.359 0.172-0.547 0.094-0.172-0.078-0.297-0.25-0.297-0.453v-3.5h-19.5c-0.281 0-0.5-0.219-0.5-0.5v-3c0-0.281 0.219-0.5 0.5-0.5h19.5v-3.5c0-0.203 0.109-0.375 0.297-0.453s0.391-0.047 0.547 0.078l6 5.469c0.094 0.094 0.156 0.219 0.156 0.359v0z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-spinner-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Loading</title><path d="M16 6h-6l2.243-2.243c-1.133-1.133-2.64-1.757-4.243-1.757s-3.109 0.624-4.243 1.757c-1.133 1.133-1.757 2.64-1.757 4.243s0.624 3.109 1.757 4.243c1.133 1.133 2.64 1.757 4.243 1.757s3.109-0.624 4.243-1.757c0.095-0.095 0.185-0.192 0.273-0.292l1.505 1.317c-1.466 1.674-3.62 2.732-6.020 2.732-4.418 0-8-3.582-8-8s3.582-8 8-8c2.209 0 4.209 0.896 5.656 2.344l2.343-2.344v6z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-check-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Done</title><path d="M14 2.5l-8.5 8.5-3.5-3.5-1.5 1.5 5 5 10-10z"></path>
+				</svg></span></a>	<span id="woocommerce_loop_add_to_cart_link_describedby_43149" class="screen-reader-text">
+			</span>
+</div></div></li>
+
+			
+					<li class="entry content-bg loop-entry product type-product post-57396 status-publish instock product_cat-battery-charger product_tag-dfrobot product_tag-lion product_tag-lithium product_tag-mppt product_tag-solar has-post-thumbnail taxable shipping-taxable purchasable product-type-simple">
+	<a href="https://www.open-electronics.org/product/solar-power-manager-5v/" class="woocommerce-loop-image-link woocommerce-LoopProduct-link woocommerce-loop-product__link"><img width="300" height="300" src="https://www.open-electronics.org/wp-content/uploads/2026/08/9145-DFR0559_9-300x300.webp" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="Solar Power Manager 5V" decoding="async" loading="lazy" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/9145-DFR0559_9-300x300.webp 300w, https://www.open-electronics.org/wp-content/uploads/2026/08/9145-DFR0559_9-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/9145-DFR0559_9-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/9145-DFR0559_9-460x460.webp 460w, https://www.open-electronics.org/wp-content/uploads/2026/08/9145-DFR0559_9.webp 600w" sizes="auto, (max-width: 300px) 100vw, 300px" /></a><span class="oe-etichette"><span class="oe-etichetta">Battery chargers</span></span><div class="product-details content-bg entry-content-wrap"><h2 class="woocommerce-loop-product__title"><a href="https://www.open-electronics.org/product/solar-power-manager-5v/" class="woocommerce-LoopProduct-link-title woocommerce-loop-product__title_ink">Solar Power Manager 5V</a></h2><div class="oe-scheda__sku"><span class="oe-scheda__sku-nome">SKU</span> 9145-DFR0559</div>
+	<span class="price"><span class="oe-prezzo2"><span class="oe-prezzo2__voce oe-prezzo2__voce--netto"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>11.07</span></span><span class="oe-prezzo2__nota">excl. VAT</span></span><span class="oe-prezzo2__voce oe-prezzo2__voce--lordo"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>13.50</span></span><span class="oe-prezzo2__nota">incl. VAT</span></span></span></span>
+<div class="product-action-wrap"><a href="/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/?add-to-cart=57396" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="57396" data-product_sku="9145-DFR0559" aria-label="Add to cart: &ldquo;Solar Power Manager 5V&rdquo;" rel="nofollow" data-success_message="&ldquo;Solar Power Manager 5V&rdquo; has been added to your cart" role="button">Add to cart<span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-right-alt-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="27" height="28" viewBox="0 0 27 28"><title>Continue</title><path d="M27 13.953c0 0.141-0.063 0.281-0.156 0.375l-6 5.531c-0.156 0.141-0.359 0.172-0.547 0.094-0.172-0.078-0.297-0.25-0.297-0.453v-3.5h-19.5c-0.281 0-0.5-0.219-0.5-0.5v-3c0-0.281 0.219-0.5 0.5-0.5h19.5v-3.5c0-0.203 0.109-0.375 0.297-0.453s0.391-0.047 0.547 0.078l6 5.469c0.094 0.094 0.156 0.219 0.156 0.359v0z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-spinner-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Loading</title><path d="M16 6h-6l2.243-2.243c-1.133-1.133-2.64-1.757-4.243-1.757s-3.109 0.624-4.243 1.757c-1.133 1.133-1.757 2.64-1.757 4.243s0.624 3.109 1.757 4.243c1.133 1.133 2.64 1.757 4.243 1.757s3.109-0.624 4.243-1.757c0.095-0.095 0.185-0.192 0.273-0.292l1.505 1.317c-1.466 1.674-3.62 2.732-6.020 2.732-4.418 0-8-3.582-8-8s3.582-8 8-8c2.209 0 4.209 0.896 5.656 2.344l2.343-2.344v6z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-check-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Done</title><path d="M14 2.5l-8.5 8.5-3.5-3.5-1.5 1.5 5 5 10-10z"></path>
+				</svg></span></a>	<span id="woocommerce_loop_add_to_cart_link_describedby_57396" class="screen-reader-text">
+			</span>
+</div></div></li>
+
+			
+		</ul>
+
+	</section>
+	
+	<section class="up-sells upsells products">
+					<h2>You may also like&hellip;</h2>
+		
+		<ul class="products content-wrap product-archive grid-cols grid-ss-col-2 grid-sm-col-3 grid-lg-col-4 woo-archive-action-on-hover woo-archive-btn-text  woo-archive-image-hover-none">
+			
+				<li class="entry content-bg loop-entry product type-product post-41884 status-publish first instock product_cat-rechargeable-batteries product_tag-18650-battery product_tag-li-ion-18650-cell product_tag-rechargeable-18650-battery has-post-thumbnail taxable shipping-taxable purchasable product-type-simple">
+	<a href="https://www.open-electronics.org/product/18650-li-ion-battery-3000mah/" class="woocommerce-loop-image-link woocommerce-LoopProduct-link woocommerce-loop-product__link"><img width="300" height="300" src="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-INR18650_9-300x300.webp" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="18650 Li-ion Battery - 3000mAh" decoding="async" loading="lazy" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/7893-INR18650_9-300x300.webp 300w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-INR18650_9-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-INR18650_9-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-INR18650_9-460x460.webp 460w, https://www.open-electronics.org/wp-content/uploads/2026/08/7893-INR18650_9.webp 600w" sizes="auto, (max-width: 300px) 100vw, 300px" /></a><span class="oe-etichette"><span class="oe-etichetta">Rechargeable batteries</span></span><div class="product-details content-bg entry-content-wrap"><h2 class="woocommerce-loop-product__title"><a href="https://www.open-electronics.org/product/18650-li-ion-battery-3000mah/" class="woocommerce-LoopProduct-link-title woocommerce-loop-product__title_ink">18650 Li-ion Battery &#8211; 3000mAh</a></h2><div class="oe-scheda__sku"><span class="oe-scheda__sku-nome">SKU</span> 7893-INR18650</div>
+	<span class="price"><span class="oe-prezzo2"><span class="oe-prezzo2__voce oe-prezzo2__voce--netto"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>6.48</span></span><span class="oe-prezzo2__nota">excl. VAT</span></span><span class="oe-prezzo2__voce oe-prezzo2__voce--lordo"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>7.90</span></span><span class="oe-prezzo2__nota">incl. VAT</span></span></span></span>
+<div class="product-action-wrap"><a href="/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/?add-to-cart=41884" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="41884" data-product_sku="7893-INR18650" aria-label="Add to cart: &ldquo;18650 Li-ion Battery - 3000mAh&rdquo;" rel="nofollow" data-success_message="&ldquo;18650 Li-ion Battery - 3000mAh&rdquo; has been added to your cart" role="button">Add to cart<span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-right-alt-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="27" height="28" viewBox="0 0 27 28"><title>Continue</title><path d="M27 13.953c0 0.141-0.063 0.281-0.156 0.375l-6 5.531c-0.156 0.141-0.359 0.172-0.547 0.094-0.172-0.078-0.297-0.25-0.297-0.453v-3.5h-19.5c-0.281 0-0.5-0.219-0.5-0.5v-3c0-0.281 0.219-0.5 0.5-0.5h19.5v-3.5c0-0.203 0.109-0.375 0.297-0.453s0.391-0.047 0.547 0.078l6 5.469c0.094 0.094 0.156 0.219 0.156 0.359v0z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-spinner-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Loading</title><path d="M16 6h-6l2.243-2.243c-1.133-1.133-2.64-1.757-4.243-1.757s-3.109 0.624-4.243 1.757c-1.133 1.133-1.757 2.64-1.757 4.243s0.624 3.109 1.757 4.243c1.133 1.133 2.64 1.757 4.243 1.757s3.109-0.624 4.243-1.757c0.095-0.095 0.185-0.192 0.273-0.292l1.505 1.317c-1.466 1.674-3.62 2.732-6.020 2.732-4.418 0-8-3.582-8-8s3.582-8 8-8c2.209 0 4.209 0.896 5.656 2.344l2.343-2.344v6z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-check-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Done</title><path d="M14 2.5l-8.5 8.5-3.5-3.5-1.5 1.5 5 5 10-10z"></path>
+				</svg></span></a>	<span id="woocommerce_loop_add_to_cart_link_describedby_41884" class="screen-reader-text">
+			</span>
+</div></div></li>
+
+			
+				<li class="entry content-bg loop-entry product type-product post-44802 status-publish instock product_cat-rechargeable-batteries product_tag-hr20 product_tag-nimh product_tag-varta has-post-thumbnail taxable shipping-taxable purchasable product-type-simple">
+	<a href="https://www.open-electronics.org/product/varta-d-ready-to-use-battery-2-pcs/" class="woocommerce-loop-image-link woocommerce-LoopProduct-link woocommerce-loop-product__link"><img width="300" height="300" src="https://www.open-electronics.org/wp-content/uploads/2026/08/8228-HR20C3000main-300x300.webp" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="VARTA D Ready To Use Battery - 2 Pcs" decoding="async" loading="lazy" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/8228-HR20C3000main-300x300.webp 300w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-HR20C3000main-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-HR20C3000main-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-HR20C3000main-460x460.webp 460w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-HR20C3000main.webp 600w" sizes="auto, (max-width: 300px) 100vw, 300px" /></a><span class="oe-etichette"><span class="oe-etichetta">Rechargeable batteries</span></span><div class="product-details content-bg entry-content-wrap"><h2 class="woocommerce-loop-product__title"><a href="https://www.open-electronics.org/product/varta-d-ready-to-use-battery-2-pcs/" class="woocommerce-LoopProduct-link-title woocommerce-loop-product__title_ink">VARTA D Ready To Use Battery &#8211; 2 Pcs</a></h2><div class="oe-scheda__sku"><span class="oe-scheda__sku-nome">SKU</span> 8228-HR20C3000</div>
+	<span class="price"><span class="oe-prezzo2"><span class="oe-prezzo2__voce oe-prezzo2__voce--netto"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>13.77</span></span><span class="oe-prezzo2__nota">excl. VAT</span></span><span class="oe-prezzo2__voce oe-prezzo2__voce--lordo"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>16.80</span></span><span class="oe-prezzo2__nota">incl. VAT</span></span></span></span>
+<div class="product-action-wrap"><a href="/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/?add-to-cart=44802" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="44802" data-product_sku="8228-HR20C3000" aria-label="Add to cart: &ldquo;VARTA D Ready To Use Battery - 2 Pcs&rdquo;" rel="nofollow" data-success_message="&ldquo;VARTA D Ready To Use Battery - 2 Pcs&rdquo; has been added to your cart" role="button">Add to cart<span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-right-alt-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="27" height="28" viewBox="0 0 27 28"><title>Continue</title><path d="M27 13.953c0 0.141-0.063 0.281-0.156 0.375l-6 5.531c-0.156 0.141-0.359 0.172-0.547 0.094-0.172-0.078-0.297-0.25-0.297-0.453v-3.5h-19.5c-0.281 0-0.5-0.219-0.5-0.5v-3c0-0.281 0.219-0.5 0.5-0.5h19.5v-3.5c0-0.203 0.109-0.375 0.297-0.453s0.391-0.047 0.547 0.078l6 5.469c0.094 0.094 0.156 0.219 0.156 0.359v0z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-spinner-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Loading</title><path d="M16 6h-6l2.243-2.243c-1.133-1.133-2.64-1.757-4.243-1.757s-3.109 0.624-4.243 1.757c-1.133 1.133-1.757 2.64-1.757 4.243s0.624 3.109 1.757 4.243c1.133 1.133 2.64 1.757 4.243 1.757s3.109-0.624 4.243-1.757c0.095-0.095 0.185-0.192 0.273-0.292l1.505 1.317c-1.466 1.674-3.62 2.732-6.020 2.732-4.418 0-8-3.582-8-8s3.582-8 8-8c2.209 0 4.209 0.896 5.656 2.344l2.343-2.344v6z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-check-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Done</title><path d="M14 2.5l-8.5 8.5-3.5-3.5-1.5 1.5 5 5 10-10z"></path>
+				</svg></span></a>	<span id="woocommerce_loop_add_to_cart_link_describedby_44802" class="screen-reader-text">
+			</span>
+</div></div></li>
+
+			
+				<li class="entry content-bg loop-entry product type-product post-44819 status-publish instock product_cat-rechargeable-batteries product_tag-12v-battery product_tag-agm product_tag-lead product_tag-ultracell has-post-thumbnail taxable shipping-taxable purchasable product-type-simple">
+	<a href="https://www.open-electronics.org/product/ultracell-rechargeable-battery-12-v-7-ah/" class="woocommerce-loop-image-link woocommerce-LoopProduct-link woocommerce-loop-product__link"><img width="300" height="300" src="https://www.open-electronics.org/wp-content/uploads/2026/08/8228-UL7-12_1-300x300.webp" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="ULTRACELL Rechargeable Battery 12 V - 7 Ah" decoding="async" loading="lazy" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/8228-UL7-12_1-300x300.webp 300w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-UL7-12_1-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-UL7-12_1-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-UL7-12_1-460x460.webp 460w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-UL7-12_1.webp 600w" sizes="auto, (max-width: 300px) 100vw, 300px" /></a><span class="oe-etichette"><span class="oe-etichetta">Rechargeable batteries</span></span><div class="product-details content-bg entry-content-wrap"><h2 class="woocommerce-loop-product__title"><a href="https://www.open-electronics.org/product/ultracell-rechargeable-battery-12-v-7-ah/" class="woocommerce-LoopProduct-link-title woocommerce-loop-product__title_ink">ULTRACELL Rechargeable Battery 12 V &#8211; 7 Ah</a></h2><div class="oe-scheda__sku"><span class="oe-scheda__sku-nome">SKU</span> 8228-UL7-12</div>
+	<span class="price"><span class="oe-prezzo2"><span class="oe-prezzo2__voce oe-prezzo2__voce--netto"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>23.69</span></span><span class="oe-prezzo2__nota">excl. VAT</span></span><span class="oe-prezzo2__voce oe-prezzo2__voce--lordo"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>28.90</span></span><span class="oe-prezzo2__nota">incl. VAT</span></span></span></span>
+<div class="product-action-wrap"><a href="/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/?add-to-cart=44819" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="44819" data-product_sku="8228-UL7-12" aria-label="Add to cart: &ldquo;ULTRACELL Rechargeable Battery 12 V - 7 Ah&rdquo;" rel="nofollow" data-success_message="&ldquo;ULTRACELL Rechargeable Battery 12 V - 7 Ah&rdquo; has been added to your cart" role="button">Add to cart<span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-right-alt-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="27" height="28" viewBox="0 0 27 28"><title>Continue</title><path d="M27 13.953c0 0.141-0.063 0.281-0.156 0.375l-6 5.531c-0.156 0.141-0.359 0.172-0.547 0.094-0.172-0.078-0.297-0.25-0.297-0.453v-3.5h-19.5c-0.281 0-0.5-0.219-0.5-0.5v-3c0-0.281 0.219-0.5 0.5-0.5h19.5v-3.5c0-0.203 0.109-0.375 0.297-0.453s0.391-0.047 0.547 0.078l6 5.469c0.094 0.094 0.156 0.219 0.156 0.359v0z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-spinner-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Loading</title><path d="M16 6h-6l2.243-2.243c-1.133-1.133-2.64-1.757-4.243-1.757s-3.109 0.624-4.243 1.757c-1.133 1.133-1.757 2.64-1.757 4.243s0.624 3.109 1.757 4.243c1.133 1.133 2.64 1.757 4.243 1.757s3.109-0.624 4.243-1.757c0.095-0.095 0.185-0.192 0.273-0.292l1.505 1.317c-1.466 1.674-3.62 2.732-6.020 2.732-4.418 0-8-3.582-8-8s3.582-8 8-8c2.209 0 4.209 0.896 5.656 2.344l2.343-2.344v6z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-check-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Done</title><path d="M14 2.5l-8.5 8.5-3.5-3.5-1.5 1.5 5 5 10-10z"></path>
+				</svg></span></a>	<span id="woocommerce_loop_add_to_cart_link_describedby_44819" class="screen-reader-text">
+			</span>
+</div></div></li>
+
+			
+				<li class="entry content-bg loop-entry product type-product post-44878 status-publish last instock product_cat-rechargeable-batteries product_tag-goobay product_tag-lr6 product_tag-nimh has-post-thumbnail taxable shipping-taxable purchasable product-type-simple">
+	<a href="https://www.open-electronics.org/product/ni-mh-rechargeable-battery-1-2v-2100-mah-type-aa/" class="woocommerce-loop-image-link woocommerce-LoopProduct-link woocommerce-loop-product__link"><img width="300" height="300" src="https://www.open-electronics.org/wp-content/uploads/2026/08/8228-WT55509-300x300.webp" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="Ni-MH Rechargeable Battery 1.2V - 2100 mAh type AA" decoding="async" loading="lazy" srcset="https://www.open-electronics.org/wp-content/uploads/2026/08/8228-WT55509-300x300.webp 300w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-WT55509-150x150.webp 150w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-WT55509-100x100.webp 100w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-WT55509-460x460.webp 460w, https://www.open-electronics.org/wp-content/uploads/2026/08/8228-WT55509.webp 600w" sizes="auto, (max-width: 300px) 100vw, 300px" /></a><span class="oe-etichette"><span class="oe-etichetta">Rechargeable batteries</span></span><div class="product-details content-bg entry-content-wrap"><h2 class="woocommerce-loop-product__title"><a href="https://www.open-electronics.org/product/ni-mh-rechargeable-battery-1-2v-2100-mah-type-aa/" class="woocommerce-LoopProduct-link-title woocommerce-loop-product__title_ink">Ni-MH Rechargeable Battery 1.2V &#8211; 2100 mAh type AA</a></h2><div class="oe-scheda__sku"><span class="oe-scheda__sku-nome">SKU</span> 8228-WT55509</div>
+	<span class="price"><span class="oe-prezzo2"><span class="oe-prezzo2__voce oe-prezzo2__voce--netto"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>3.69</span></span><span class="oe-prezzo2__nota">excl. VAT</span></span><span class="oe-prezzo2__voce oe-prezzo2__voce--lordo"><span class="oe-prezzo2__cifra"><span class="woocommerce-Price-amount amount"><span class="woocommerce-Price-currencySymbol" dir="auto">&euro;</span>4.50</span></span><span class="oe-prezzo2__nota">incl. VAT</span></span></span></span>
+<div class="product-action-wrap"><a href="/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/?add-to-cart=44878" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="44878" data-product_sku="8228-WT55509" aria-label="Add to cart: &ldquo;Ni-MH Rechargeable Battery 1.2V - 2100 mAh type AA&rdquo;" rel="nofollow" data-success_message="&ldquo;Ni-MH Rechargeable Battery 1.2V - 2100 mAh type AA&rdquo; has been added to your cart" role="button">Add to cart<span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-right-alt-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="27" height="28" viewBox="0 0 27 28"><title>Continue</title><path d="M27 13.953c0 0.141-0.063 0.281-0.156 0.375l-6 5.531c-0.156 0.141-0.359 0.172-0.547 0.094-0.172-0.078-0.297-0.25-0.297-0.453v-3.5h-19.5c-0.281 0-0.5-0.219-0.5-0.5v-3c0-0.281 0.219-0.5 0.5-0.5h19.5v-3.5c0-0.203 0.109-0.375 0.297-0.453s0.391-0.047 0.547 0.078l6 5.469c0.094 0.094 0.156 0.219 0.156 0.359v0z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-spinner-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Loading</title><path d="M16 6h-6l2.243-2.243c-1.133-1.133-2.64-1.757-4.243-1.757s-3.109 0.624-4.243 1.757c-1.133 1.133-1.757 2.64-1.757 4.243s0.624 3.109 1.757 4.243c1.133 1.133 2.64 1.757 4.243 1.757s3.109-0.624 4.243-1.757c0.095-0.095 0.185-0.192 0.273-0.292l1.505 1.317c-1.466 1.674-3.62 2.732-6.020 2.732-4.418 0-8-3.582-8-8s3.582-8 8-8c2.209 0 4.209 0.896 5.656 2.344l2.343-2.344v6z"></path>
+				</svg></span><span class="kadence-svg-iconset svg-baseline"><svg class="kadence-svg-icon kadence-check-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><title>Done</title><path d="M14 2.5l-8.5 8.5-3.5-3.5-1.5 1.5 5 5 10-10z"></path>
+				</svg></span></a>	<span id="woocommerce_loop_add_to_cart_link_describedby_44878" class="screen-reader-text">
+			</span>
+</div></div></li>
+
+			
+		</ul>
+
+	</section>
+
+		</div>
+</div>
+
+
+		
+	</main></div></div>
+	
+	</main><!-- #inner-wrap -->
+		<div class="oe-fondo">
+		<div class="oe-contenitore oe-fondo__griglia">
+
+			<div class="oe-fondo__chi">
+				<h2>About us</h2>
+				<p><strong>Open-Electronics.org</strong> is the brainchild of a world leader in
+				hobby electronics <a href="https://www.futuragroupsrl.it/" rel="noopener"
+				target="_blank">Futura Group srl</a>. Open-Electronics.org is devoted to support
+				development, hacking and playing with electronics: we share exciting open projects
+				and create amazing products!</p>
+				<p>Open-Electronics.org is not just a container of ideas: it is also a web site lead
+				by a team of engineers and geeks who will take part in the discussions and give
+				support.</p>
+				<p><strong>Our mission</strong> is to become a reference Open Source hacking site
+				with ideas and feedback aimed to enrich the community.</p>
+							</div>
+
+			<div class="oe-fondo__colonna">
+				<h2>Read</h2>
+				<ul>					<li><a href="https://www.open-electronics.org/category/news/">News</a></li>
+									<li><a href="https://www.open-electronics.org/category/opensourceprojects/">Open Source Projects</a></li>
+									<li><a href="https://www.open-electronics.org/category/tutorial/">Tutorials</a></li>
+									<li><a href="https://www.open-electronics.org/category/interviews/">Interviews</a></li>
+									<li><a href="https://www.open-electronics.org/category/opeds/">Opinions</a></li>
+				</ul>
+			</div>
+
+			<div class="oe-fondo__colonna">
+				<h2>Shop</h2>
+				<ul>					<li><a href="https://www.open-electronics.org/shop/?orderby=menu_order">All products</a></li>
+									<li><a href="https://www.open-electronics.org/cart/">Cart</a></li>
+									<li><a href="https://www.open-electronics.org/my-account/">My account</a></li>
+				</ul>
+			</div>
+
+			<div class="oe-fondo__colonna">
+				<h2>Company</h2>
+				<ul>					<li><a href="https://www.open-electronics.org/about/">About</a></li>
+									<li><a href="https://www.open-electronics.org/advertise-with-open-electronics/">Advertise</a></li>
+									<li><a href="https://www.open-electronics.org/contacts/">Contacts</a></li>
+				</ul>
+			</div>
+
+		</div>
+	</div>
+	<footer id="colophon" class="site-footer" role="contentinfo">
+	<div class="site-footer-wrap">
+		<div class="site-bottom-footer-wrap site-footer-row-container site-footer-focus-item site-footer-row-layout-standard site-footer-row-tablet-layout-default site-footer-row-mobile-layout-default" data-section="kadence_customizer_footer_bottom">
+	<div class="site-footer-row-container-inner">
+				<div class="site-container">
+			<div class="site-bottom-footer-inner-wrap site-footer-row site-footer-row-columns-1 site-footer-row-column-layout-row site-footer-row-tablet-column-layout-default site-footer-row-mobile-column-layout-row ft-ro-dir-row ft-ro-collapse-normal ft-ro-t-dir-default ft-ro-m-dir-default ft-ro-lstyle-plain">
+									<div class="site-footer-bottom-section-1 site-footer-section footer-section-inner-items-1">
+						
+<div class="footer-widget-area site-info site-footer-focus-item content-align-default content-tablet-align-default content-mobile-align-default content-valign-default content-tablet-valign-default content-mobile-valign-default" data-section="kadence_customizer_footer_html">
+	<div class="footer-widget-area-inner site-info-inner">
+		<div class="footer-html inner-link-style-normal"><div class="footer-html-inner"><p>&copy; 2026 Open Electronics </p>
+</div></div><div class="oe-piede-legale footer-html inner-link-style-normal"><div class="footer-html-inner"><p class="oe-piede-legale__societa" style="margin:.35rem 0 0;font-size:.85em">Futura Group Srl &middot; Via Adige 11, 21013 Gallarate (VA), Italy<br>VAT no. IT10918280156 &middot; Varese Companies Register no. 10918280156 &middot; REA VA-297771 &middot; Share capital €60,000 fully paid</p><p class="oe-piede-legale__link" style="margin:.35rem 0 0;font-size:.85em"><a href="https://www.open-electronics.org/terms-of-sale/">Terms of sale</a> &middot; <a href="https://www.open-electronics.org/contacts/">Contact us</a></p></div></div><div class="oe-consenso-link footer-html inner-link-style-normal"><div class="footer-html-inner"><a href="#" data-oe-consenso-riapri>Cookies</a> &middot; <a href="https://www.open-electronics.org/privacy-policy/">Privacy</a> &middot; <a href="https://www.open-electronics.org/policy-cookie/">Cookie policy</a></div></div>	</div>
+</div><!-- .site-info -->
+					</div>
+								</div>
+		</div>
+	</div>
+</div>
+	</div>
+</footer><!-- #colophon -->
+
+</div><!-- #wrapper -->
+
+			<script>document.documentElement.style.setProperty('--scrollbar-offset', window.innerWidth - document.documentElement.clientWidth + 'px' );</script>
+			<div id="oe-consenso" class="oe-consenso" hidden role="region" aria-live="polite" aria-label="Cookies" data-versione="5b9836515f" data-categorie="statistiche,attribuzione">
+	<p class="oe-consenso__testo">
+		We use cookies to count visits and to remember which page or campaign an order came from. No advertising or profiling cookies. You can change your mind at any time from the &quot;Cookies&quot; link at the bottom of every page.		Details in our <a href="https://www.open-electronics.org/policy-cookie/">Cookie policy</a>.	</p>
+	<p id="oe-consenso-id" class="oe-consenso__id" hidden>Your consent ID: <code></code></p>
+	<div class="oe-consenso__bottoni">
+		<button type="button" class="oe-consenso__btn oe-consenso__btn--rifiuta" data-oe-consenso="0">Reject</button>
+		<button type="button" class="oe-consenso__btn oe-consenso__btn--accetta" data-oe-consenso="1">Accept</button>
+	</div>
+</div>
+<style>
+/* 🔴 Questa prima riga non e' cosmetica, e' il banner stesso. `display:flex`
+   di un foglio d'autore VINCE su `[hidden]{display:none}` del browser: senza
+   questa regola il banner resterebbe visibile anche dopo la scelta, e
+   "Accept" sembrerebbe non fare niente. Verificato nel browser il 9/9
+   proprio cosi', prima di correggerlo. */
+.oe-consenso[hidden]{display:none}
+.oe-consenso{position:fixed;left:0;right:0;bottom:0;z-index:99999;display:flex;flex-wrap:wrap;
+	align-items:center;gap:1rem;justify-content:space-between;padding:1rem 1.25rem;
+	background:#1b1b1b;color:#f2f2f2;box-shadow:0 -2px 12px rgba(0,0,0,.25);font-size:.92rem}
+.oe-consenso__testo{margin:0;flex:1 1 320px;line-height:1.4}
+/* Il link alla cookie policy: stesso colore del testo e sottolineato (il
+   colore dei link del tema, sul fondo scuro, non si leggerebbe), e un bordo
+   ben visibile quando ci si arriva con la tastiera. */
+.oe-consenso__testo a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.oe-consenso__testo a:focus-visible{outline:2px solid #f2f2f2;outline-offset:2px;border-radius:2px}
+.oe-consenso__bottoni{display:flex;gap:.6rem;flex:0 0 auto}
+.oe-consenso__btn{border:1px solid #f2f2f2;border-radius:4px;padding:.55rem 1.1rem;font-size:.92rem;
+	cursor:pointer;background:transparent;color:#f2f2f2}
+.oe-consenso__btn--accetta{background:#f2f2f2;color:#1b1b1b}
+.oe-consenso-link{margin-top:.35rem;font-size:.85em}
+.oe-consenso__id[hidden]{display:none}
+.oe-consenso__id{margin:0;flex:1 1 100%;font-size:.8rem;opacity:.8}
+.oe-consenso__id code{color:inherit;background:transparent;font-size:inherit;user-select:all}
+</style>
+<script>
+(function () {
+	var banner = document.getElementById('oe-consenso');
+	if (!banner || !window.oeConsenso) { return; }
+
+	/* Si chiede a chi non ha ancora risposto, a chi ha una scelta scaduta, e a
+	   chi ha risposto prima del registro dei consensi (vedi daChiedere). */
+	if (window.oeConsenso.daChiedere()) { banner.hidden = false; }
+
+	banner.addEventListener('click', function (e) {
+		var bottone = e.target.closest('[data-oe-consenso]');
+		if (!bottone) { return; }
+		window.oeConsenso.scegli(bottone.getAttribute('data-oe-consenso'));
+		banner.hidden = true;
+	});
+
+	/* Il link che riapre: delegato sul documento, cosi' funziona anche per un
+	   elemento aggiunto dopo (per esempio dalla rete di sicurezza qui sotto). */
+	document.addEventListener('click', function (e) {
+		var link = e.target.closest('[data-oe-consenso-riapri]');
+		if (!link) { return; }
+		e.preventDefault();
+		window.oeConsenso.apri();
+	});
+
+	/* ----------------------------------------------------------------
+	   IL DOPPIONE DEL TRASLOCO.
+	   Fino al 9/9 un banner con questo stesso id lo stampava anche
+	   `ga4-consenso.php`, su `wp_footer` a priorita' 5 — cioe' DOPO
+	   questo blocco. Se in produzione quel file venisse aggiornato
+	   dopo, o non venisse aggiornato affatto, il giorno in cui si
+	   accende GA4 in pagina ci sarebbero DUE elementi con lo stesso
+	   id; e il secondo, che non ha la regola `[hidden]{display:none}`,
+	   resterebbe visibile e inchiodato — nessun bottone lo chiuderebbe.
+	   Si tiene il primo (questo) e si tolgono gli altri.
+	   ⚠️ Va fatto a DOM completo, non qui e subito: quando questo
+	      script gira, il secondo banner non e' ancora stato stampato.
+	   ---------------------------------------------------------------- */
+	function togliDoppioni() {
+		var doppioni = document.querySelectorAll('#oe-consenso');
+		for (var i = 1; i < doppioni.length; i++) {
+			doppioni[i].parentNode.removeChild(doppioni[i]);
+		}
+	}
+
+	/* ----------------------------------------------------------------
+	   LA RETE DI SICUREZZA SUL LINK.
+	   Il link vero lo stampa `kadence_footer_html`. Se quel blocco del
+	   pie' di pagina venisse tolto dal customizer, il banner
+	   continuerebbe a promettere un link che non esiste: la promessa
+	   verrebbe meno in silenzio, che e' il guasto peggiore. Qui si
+	   controlla che ci sia davvero, e se manca se ne mette uno.
+	   ---------------------------------------------------------------- */
+	function reteDiSicurezza() {
+		if (document.querySelector('[data-oe-consenso-riapri]')) { return; }
+		var casa = document.getElementById('colophon') || document.body;
+		var p = document.createElement('p');
+		p.className = 'oe-consenso-link';
+		p.style.textAlign = 'center';
+		var a = document.createElement('a');
+		a.href = '#';
+		a.setAttribute('data-oe-consenso-riapri', '');
+		a.textContent = 'Cookies';
+		p.appendChild(a);
+		casa.appendChild(p);
+	}
+	function aDomCompleto() {
+		togliDoppioni();
+		reteDiSicurezza();
+	}
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', aDomCompleto);
+	} else {
+		aDomCompleto();
+	}
+})();
+</script>
+<script>
+/* ------------------------------------------------------------------------
+   SOURCEBUSTER SEGUE LA SCELTA.
+   ⚠️ `window.wc_order_attribution` NON esiste ancora quando gira questo
+      script: WordPress stampa gli script accodati in
+      `wp_print_footer_scripts`, agganciato a `wp_footer` con priorita' 20,
+      cioe' DOPO questo blocco. Misurato il 9/9: chiamato subito, l'oggetto e'
+      `undefined` e la chiamata non farebbe niente — in silenzio. Per questo
+      si aspetta il DOM.
+   ------------------------------------------------------------------------ */
+(function () {
+	/* ⚠️ LA CANCELLAZIONE VERA (26/9/2026). Misurato da anonimo sul sito vivo:
+	   dopo «Reject» `setOrderTracking(false)` lasciava tutti e sette i cookie
+	   `sbjs_*` al loro posto, e `_ga`/`_ga_*` non li toccava nessuno. Il
+	   perche': `order-attribution.min.js` di WooCommerce li cancella con
+	   `domain=.www.open-electronics.org`, ma Sourcebuster li scrive SENZA
+	   dominio (host-only), e un cookie si cancella solo con gli stessi
+	   attributi con cui e' nato. Quindi si cancella qui, provando ogni forma:
+	   senza dominio, col dominio nudo e col punto davanti (e' cosi' che gtag
+	   scrive `_ga`: `domain=open-electronics.org`). Cancellare un cookie che
+	   non c'e' non fa niente. Si fa a OGNI caricamento senza consenso, non
+	   solo al clic su «Reject»: cosi' spariscono anche i cookie rimasti nei
+	   browser di chi ha rifiutato prima di questa correzione. Con il consenso
+	   negato ne' Sourcebuster ne' gtag ne scrivono di nuovi. */
+	function cancella() {
+		var host = location.hostname.replace(/^www\./, '');
+		document.cookie.split(';').forEach(function (c) {
+			var nome = c.split('=')[0].trim();
+			if (!/^(sbjs_|_ga$|_ga_)/.test(nome)) { return; }
+			var via = nome + '=; path=/; max-age=-999';
+			document.cookie = via;
+			document.cookie = via + '; domain=' + host;
+			document.cookie = via + '; domain=.' + host;
+			document.cookie = via + '; domain=' + location.hostname;
+		});
+	}
+	function applica() {
+		var vuole = window.oeConsenso.concesso();
+		var oa = window.wc_order_attribution;
+		/* Si chiama solo se cambia qualcosa: `setOrderTracking` riscrive anche
+		   i campi nascosti della cassa e i dati del blocco checkout, e non ha
+		   senso rifarlo a ogni caricamento per confermare un "no" che
+		   WooCommerce ha gia' applicato da solo all'avvio. */
+		if (oa && oa.params && typeof oa.setOrderTracking === 'function' && oa.params.allowTracking !== vuole) {
+			oa.setOrderTracking(vuole);
+		}
+		if (!vuole) { cancella(); }
+	}
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', applica);
+	} else {
+		applica();
+	}
+	/* E a ogni cambio d'idea successivo: li' lo script c'e' gia'. Con `false`
+	   `setOrderTracking` PROVA a cancellare i cookie sbjs_* — e sul sito vivo
+	   non ci riesce (vedi `cancella` qui sopra): la revoca vera la fa
+	   `cancella`, e cancella anche `_ga*`. */
+	window.oeConsenso.quando(applica);
+})();
+</script>
+		<script id="oe-consenso-registro">
+(function () {
+	"use strict";
+	var C = {"url":"https:\/\/www.open-electronics.org\/wp-admin\/admin-ajax.php","coda":"oe_consenso_da_mandare","n":"oe_consenso_n"};
+	var banner = document.getElementById('oe-consenso');
+	if (!banner || !window.fetch || !window.URLSearchParams) { return; }
+
+	function leggi(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+	function scrivi(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+	function coda() {
+		try { var c = JSON.parse(leggi(C.coda) || '[]'); return Array.isArray(c) ? c : []; } catch (e) { return []; }
+	}
+	function togli(r) {
+		scrivi(C.coda, JSON.stringify(coda().filter(function (x) { return !(x.id === r.id && x.n === r.n); })));
+	}
+	function manda(r) {
+		var dati = new URLSearchParams();
+		dati.append('action', 'oe_consenso');
+		dati.append('id', r.id);
+		dati.append('n', String(r.n));
+		dati.append('c', r.c);
+		dati.append('p', r.p);
+		dati.append('b', r.b);
+		fetch(C.url, { method: 'POST', body: dati, keepalive: true, credentials: 'same-origin' })
+			.then(function (risposta) {
+				if (risposta.status === 204 || risposta.status === 400) { togli(r); }
+			})
+			.catch(function () {});
+	}
+
+	document.addEventListener('oe-consenso-scelta', function (e) {
+		var d = e.detail || {};
+		if (!d.id) { return; }
+		/* Il progressivo riparte con un identificativo nuovo. */
+		var n = d.nuovo ? 1 : (parseInt(leggi(C.n), 10) || 0) + 1;
+		scrivi(C.n, String(n));
+		var r = {
+			id: d.id,
+			n: n,
+			c: d.valore === '1' ? (banner.getAttribute('data-categorie') || '') : '',
+			p: d.precedente === '1' ? 'accetta' : (d.precedente === '0' ? 'rifiuta' : ''),
+			b: banner.getAttribute('data-versione') || ''
+		};
+		/* Al massimo dieci in coda: un browser che non riesce mai a mandare non
+		   deve riempire la memoria. */
+		var c = coda();
+		c.push(r);
+		scrivi(C.coda, JSON.stringify(c.slice(-10)));
+		manda(r);
+	});
+
+	/* Quello che era rimasto indietro dalla visita prima. */
+	coda().forEach(manda);
+})();
+</script>
+		<script>
+if (window.oeConsenso && window.gtag) {
+	window.oeConsenso.quando(function (ok) {
+		gtag('consent', 'update', { 'analytics_storage': ok ? 'granted' : 'denied' });
+	});
+}
+</script>
+		<script>
+(function () {
+	var NOME = 'oe_rif_articolo';
+
+	function scrivi() {
+		try {
+			var parametri = new URL(window.location.href).searchParams;
+			var articolo = parseInt(parametri.get('oe_rif'), 10);
+			if (!articolo || articolo <= 0) { return; }
+			var scadenza = new Date(Date.now() + 30 * 86400000).toUTCString();
+			document.cookie = NOME + '=' + articolo + '; path=/; expires=' + scadenza + '; SameSite=Lax';
+		} catch (e) { /* niente URL/cookie: si perde solo l'attribuzione di questa visita. */ }
+	}
+	function cancella() {
+		try { document.cookie = NOME + '=; path=/; max-age=-999'; } catch (e) {}
+	}
+
+	/* 🔴 9/9/2026: anche questo e' un cookie di attribuzione, quindi anche
+	   questo aspetta il consenso — prima si scriveva sempre. Non si vedeva
+	   perche' `oe_ga4_attivo()` e' falso finche' manca l'ID GA4: sarebbe
+	   partito senza consenso il giorno stesso in cui si incolla l'ID, che e'
+	   il modo peggiore di scoprirlo. Con `false` si cancella anche quello
+	   gia' scritto: e' revoca, non solo "da adesso basta". */
+	if (window.oeConsenso) {
+		window.oeConsenso.quando(function (ok) { if (ok) { scrivi(); } else { cancella(); } });
+	}
+})();
+</script>
+		<script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/openelectronics-verge/*","/wp-content/themes/kadence/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+<script>
+window.oeGa4Catalogo = Object.assign( window.oeGa4Catalogo || {}, {"43546":{"item_id":"6374-PLIB1000-2MM","item_name":"Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch","price":5.66,"currency":"EUR","item_category":"Rechargeable batteries"},"43149":{"item_id":"3085-LIPOSOLAR","item_name":"MPPT Charger for LiPo Batteries","price":6.15,"currency":"EUR","item_category":"Battery chargers"},"57396":{"item_id":"9145-DFR0559","item_name":"Solar Power Manager 5V","price":11.07,"currency":"EUR","item_category":"Battery chargers"}} );
+if (window.gtag) {
+	gtag('event', 'view_item', {
+		currency: 'EUR',
+		value: 5.66,
+		items: [ {"item_id":"6374-PLIB1000-2MM","item_name":"Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch","price":5.66,"currency":"EUR","item_category":"Rechargeable batteries"} ]
+	});
+}
+</script>
+		<script>
+(function () {
+	function manda( id, quantita ) {
+		if (!window.gtag) { return; }
+		var catalogo = window.oeGa4Catalogo || {};
+		var base = catalogo[String(id)];
+		var voce = Object.assign( { item_id: String(id) }, base || {}, { quantity: quantita || 1 } );
+		gtag('event', 'add_to_cart', {
+			currency: 'EUR',
+			value: (voce.price || 0) * (quantita || 1),
+			items: [voce]
+		});
+	}
+
+	// 1. Bottone AJAX — evento jQuery globale di WooCommerce.
+	if (window.jQuery) {
+		jQuery(document.body).on('added_to_cart', function (e, fragments, hash, $bottone) {
+			if (!$bottone || !$bottone.length) { return; }
+			var id = $bottone.data('product_id');
+			var quantita = $bottone.data('quantity') || 1;
+			if (id) { manda(id, quantita); }
+		});
+	}
+
+	// 2. Modulo scheda prodotto — pagina ricaricata, l'indirizzo lo dice.
+	try {
+		var url = new URL(window.location.href);
+		var aggiunti = url.searchParams.get('added-to-cart');
+		if (aggiunti) {
+			aggiunti.split(',').forEach(function (id) { manda(id.trim(), 1); });
+		}
+	} catch (e) { /* URL non disponibile: si perde solo questo evento. */ }
+})();
+</script>
+			<script>
+	(function () {
+		var avviso = document.querySelector('.oe-avviso-it');
+		if (!avviso) { return; }
+
+		var CHIUSO = 'oe-avviso-it-chiuso';
+		if (sessionStorage.getItem(CHIUSO) === '1') { return; }
+
+		/* Il paese che risulta adesso. Si tiene da parte perche' la fascia puo'
+		   dover essere ridisegnata piu' tardi, quando il visitatore risponde
+		   sui cookie (vedi sotto). */
+		var paese_noto = null;
+
+		function mostra(paese) {
+			paese_noto = paese;
+			disegna();
+		}
+
+		/* 22/9/2026: la fascia e' FISSA IN BASSO (vedi il commento in style.css),
+		   e li' sotto ci sta anche il banner dei cookie, che ha z-index 99999 e
+		   vince. Finche' il visitatore non ha risposto sui cookie la fascia non
+		   si mostra: comparirebbe sotto il banner, invisibile e non cliccabile.
+		   `oeConsenso.quando()` chiama subito e poi a ogni scelta, quindi appena
+		   il banner sparisce la fascia arriva da sola. Se il plugin del consenso
+		   non c'e' (`window.oeConsenso` assente) la fascia si comporta come
+		   prima: si mostra e basta. */
+		function cookie_in_mezzo() {
+			return !!(window.oeConsenso && window.oeConsenso.stato && window.oeConsenso.stato() === null);
+		}
+
+		function disegna() {
+			/* Chiusa e' chiusa: `disegna()` puo' essere richiamata piu' tardi
+			   (una seconda scelta sui cookie dal link nel piede), e una fascia
+			   che il visitatore ha gia' scacciato non deve tornare. */
+			if (sessionStorage.getItem(CHIUSO) === '1') { avviso.hidden = true; return; }
+			if (paese_noto !== avviso.dataset.oePaese || cookie_in_mezzo()) {
+				avviso.hidden = true;
+				return;
+			}
+			avviso.hidden = false;
+		}
+
+		if (window.oeConsenso && window.oeConsenso.quando) {
+			window.oeConsenso.quando(function () { disegna(); });
+		}
+
+		/* Il paese si chiede una volta per visita e si tiene da parte:
+		   e' una chiamata sola, non una per pagina. */
+
+		/* 26/9/2026, dopo Lightpanda: il 40% del lavoro che quel robot faceva
+		   fare a PHP era QUESTA chiamata, perche' un browser headless riparte
+		   ogni volta senza sessionStorage. admin-ajax avvia WordPress intero
+		   (e con l'origine sotto carico ci metteva 13 s) per dire un paese che
+		   Cloudflare conosce gia'. Adesso lo si chiede al BORDO: `paese.js` e'
+		   un file statico in cache, e Cloudflare aggiunge alla risposta
+		   l'intestazione `x-oe-paese` (Transform Rule, paese-al-bordo.py).
+		   Zero PHP.
+		   ⚠️ Solo per chi non ha ancora un indirizzo: `oe_paese_cliente()` fa
+		   vincere il paese di fatturazione sull'IP, e un indirizzo esiste solo
+		   per chi e' loggato o ha una sessione di WooCommerce. Il segno che si
+		   vede da JS e' la classe `logged-in` o il cookie
+		   `woocommerce_items_in_cart`: in quei casi si chiede a WordPress come
+		   prima. Idem se l'intestazione manca (Docker locale, regola spenta) o
+		   non e' un paese (Cloudflare scrive XX se non lo sa, T1 per Tor). */
+		function chiedi_al_bordo() {
+			if (document.body.classList.contains('logged-in')
+				|| /(?:^|;\s*)woocommerce_items_in_cart=/.test(document.cookie)) {
+				return Promise.resolve('');
+			}
+			/* `?v=1`: la prima richiesta, fatta prima che il file fosse posato, ha
+			   lasciato un 404 nella cache del bordo (OE 4 tiene i .js 30 giorni).
+			   L'intestazione c'e' lo stesso, ma una query nuova evita di dipendere
+			   da una purga. Se si cambia il file, si cambia il numero. */
+			return fetch('https://www.open-electronics.org/wp-content/themes/openelectronics-verge/paese.js?v=1',
+					{ cache: 'no-store', credentials: 'omit' })
+				.then(function (r) {
+					var p = (r.headers.get('x-oe-paese') || '').toUpperCase();
+					return (/^[A-Z]{2}$/.test(p) && p !== 'XX' && p !== 'T1') ? p : '';
+				})
+				.catch(function () { return ''; });
+		}
+
+		function chiedi_a_wordpress() {
+			return fetch('https://www.open-electronics.org/wp-admin/admin-ajax.php?action=oe_paese', { credentials: 'same-origin' })
+				.then(function (r) { return r.json(); })
+				.then(function (d) { return (d && d.paese) || ''; });
+		}
+
+		var noto = sessionStorage.getItem('oe-paese');
+		if (noto) {
+			mostra(noto);
+		} else {
+			chiedi_al_bordo()
+				.then(function (p) { return p || chiedi_a_wordpress(); })
+				.then(function (p) {
+					if (!p) { return; }
+					sessionStorage.setItem('oe-paese', p);
+					mostra(p);
+				})
+				.catch(function () { /* niente avviso e' meglio di un avviso sbagliato */ });
+		}
+
+		/* Al pagamento il paese si sceglie a mano: l'avviso deve seguire
+		   quello che il cliente scrive, non quello che dice il suo IP. */
+		var campo = document.getElementById('billing_country');
+		if (campo) {
+			campo.addEventListener('change', function () {
+				sessionStorage.removeItem('oe-paese');
+				if (sessionStorage.getItem(CHIUSO) !== '1') { mostra(campo.value); }
+			});
+		}
+
+		avviso.querySelector('.oe-avviso-it__chiudi').addEventListener('click', function () {
+			sessionStorage.setItem(CHIUSO, '1');
+			avviso.hidden = true;
+		});
+	})();
+	</script>
+	<script type="application/ld+json">{"@context":"https://schema.org/","@type":"Product","@id":"https://www.open-electronics.org/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/#product","name":"Lithium Polymer Battery 3.7V 1000mA - 2mm Pitch","url":"https://www.open-electronics.org/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/","description":"Rechargeable lithium polymer battery 3.7 V / 1000 mAh","image":"https://www.open-electronics.org/wp-content/uploads/2026/08/6374-PLIB1000-2MM.webp","sku":"6374-PLIB1000-2MM","gtin":"8219671108904","offers":[{"@type":"Offer","priceSpecification":[{"@type":"UnitPriceSpecification","price":"6.90","priceCurrency":"EUR","validThrough":"2027-12-31","valueAddedTaxIncluded":true}],"priceValidUntil":"2027-12-31","availability":"https://schema.org/InStock","url":"https://www.open-electronics.org/product/lithium-polymer-battery-3-7v-1000ma-2mm-pitch/","seller":{"@type":"Organization","name":"Open Electronics","url":"https://www.open-electronics.org"},"price":"6.90","priceCurrency":"EUR","hasMerchantReturnPolicy":{"@type":"MerchantReturnPolicy","returnPolicyCategory":"https://schema.org/MerchantReturnFiniteReturnWindow","merchantReturnDays":14,"returnMethod":"https://schema.org/ReturnByMail","returnFees":"https://schema.org/ReturnFeesCustomerResponsibleForShipping","applicableCountry":["AU","AT","BE","BG","CA","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IS","IE","IT","JP","LV","LI","LT","LU","MT","NL","NZ","NO","PL","PT","RO","SK","SI","ES","SE","CH","GB","US"],"merchantReturnLink":"https://www.open-electronics.org/terms-of-sale/"},"validFrom":"2026-10-05T13:59:23+00:00","itemCondition":"https://schema.org/NewCondition"}]}</script>
+<div id="photoswipe-fullscreen-dialog" class="pswp" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Full screen image">
+	<div class="pswp__bg"></div>
+	<div class="pswp__scroll-wrap">
+		<div class="pswp__container">
+			<div class="pswp__item"></div>
+			<div class="pswp__item"></div>
+			<div class="pswp__item"></div>
+		</div>
+		<div class="pswp__ui pswp__ui--hidden">
+			<div class="pswp__top-bar">
+				<div class="pswp__counter"></div>
+				<button class="pswp__button pswp__button--zoom" aria-label="Zoom in/out"></button>
+				<button class="pswp__button pswp__button--fs" aria-label="Toggle fullscreen"></button>
+				<button class="pswp__button pswp__button--share" aria-label="Share"></button>
+				<button class="pswp__button pswp__button--close" aria-label="Close (Esc)"></button>
+				<div class="pswp__preloader">
+					<div class="pswp__preloader__icn">
+						<div class="pswp__preloader__cut">
+							<div class="pswp__preloader__donut"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+				<div class="pswp__share-tooltip"></div>
+			</div>
+			<button class="pswp__button pswp__button--arrow--left" aria-label="Previous (arrow left)"></button>
+			<button class="pswp__button pswp__button--arrow--right" aria-label="Next (arrow right)"></button>
+			<div class="pswp__caption">
+				<div class="pswp__caption__center"></div>
+			</div>
+		</div>
+	</div>
+</div>
+	<script>
+		(function () {
+			var c = document.body.className;
+			c = c.replace(/woocommerce-no-js/, 'woocommerce-js');
+			document.body.className = c;
+		})();
+	</script>
+		<div id="mobile-drawer" class="popup-drawer popup-drawer-layout-sidepanel popup-drawer-animation-fade popup-drawer-side-right" data-drawer-target-string="#mobile-drawer"
+			>
+		<div class="drawer-overlay" data-drawer-target-string="#mobile-drawer"></div>
+		<div class="drawer-inner">
+						<div class="drawer-header">
+				<button class="menu-toggle-close drawer-toggle" aria-label="Close menu"  data-toggle-target="#mobile-drawer" data-toggle-body-class="showing-popup-drawer-from-right" aria-expanded="false" data-set-focus=".menu-toggle-open"
+							>
+					<span class="toggle-close-bar"></span>
+					<span class="toggle-close-bar"></span>
+				</button>
+			</div>
+			<div class="drawer-content mobile-drawer-content content-align-left content-valign-top">
+								<div class="site-header-item site-header-focus-item site-header-item-mobile-navigation mobile-navigation-layout-stretch-false" data-section="kadence_customizer_mobile_navigation">
+		<nav id="mobile-site-navigation" class="mobile-navigation drawer-navigation" role="navigation" aria-label="Primary Mobile">
+		<div class="oe-menu-telefono__cerca">	<form role="search" method="get" class="oe-cerca oe-cerca--menu"
+	      action="https://www.open-electronics.org/">
+		<label class="screen-reader-text" for="cerca-menu">Search</label>
+				<span class="oe-cerca__campo">
+			<input id="cerca-menu" type="search" name="s"
+			       value="" autocomplete="off"
+			       placeholder="Search 4,719 products…">
+			<button type="submit" aria-label="Search">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+			</button>
+		</span>
+			<input type="hidden" name="post_type" value="product"></form>
+	</div>
+		<div class="mobile-menu-container drawer-menu-container">
+			<ul id="mobile-menu" class="menu">
+									<li class="menu-item"><a href="https://www.open-electronics.org/">Home</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/shop/">Shop</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/shop/?orderby=date">New products</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/cart/">Cart</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/my-account/">Sign in</a></li>
+								<li class="menu-item oe-menu-telefono__titolo"><span>Topics</span></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/3d-printing/">3D Printing</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/arduino/">Arduino</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/artificial-intelligence/">Artificial Intelligence</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/audio/">Audio</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/crowdfunding/">Crowdfunding</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/displays-and-interfaces/">Displays and Interfaces</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/gadget/">Gadgets</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/guests/">Guest Posts</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/health-and-medical-devices/">Health and Medical Devices</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/home-automation/">Home Automation</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/industry-news/">Industry News</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/interviews/">Interviews</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/iot/">IoT and Connectivity</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/meet-the-founders/">Meet the Founders</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/microcontrollers/">Microcontrollers</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/mods-and-hacks/">Mods and Hacks</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/news/">News</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/opensourceprojects/">Open Source Projects</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/opeds/">Opinions</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/pcb-and-cad/">PCB and CAD</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/power-energy/">Power and Energy</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/products/">Products</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/programming/">Programming</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/projects/">Projects</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/promo/">Promotions</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/raspberry-pi/">Raspberry Pi</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/robotics/">Robotics and Drones</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/tools-software/">Tools and Software</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/tutorial/">Tutorials</a></li>
+									<li class="menu-item"><a href="https://www.open-electronics.org/category/wearables/">Wearables</a></li>
+								<li class="menu-item oe-menu-telefono__titolo"><span>Open Electronics</span></li>
+				<li class="menu-item"><a href="https://www.open-electronics.org/about/">About</a></li>
+				<li class="menu-item"><a href="https://www.open-electronics.org/advertise-with-open-electronics/">Advertise</a></li>
+				<li class="menu-item"><a href="https://www.open-electronics.org/contacts/">Contacts</a></li>
+			</ul>
+		</div>
+	</nav>
+	</div><!-- data-section="mobile_navigation" -->
+							</div>
+		</div>
+	</div>
+	<link rel='stylesheet' id='bussola-scheda-css' href='https://www.open-electronics.org/wp-content/plugins/bussola/assets/bussola.css?ver=1790348827' media='all' />
+<script id="kadence-product-cls-js" src="https://www.open-electronics.org/wp-content/themes/kadence/assets/js/product-cls.min.js?ver=1.5.2"></script>
+<script id="kadence-navigation-js-extra">
+var kadenceConfig = {"screenReader":{"expand":"Child menu","expandOf":"Child menu of","collapse":"Child menu","collapseOf":"Child menu of"},"breakPoints":{"desktop":"1024","tablet":768},"scrollOffset":"0"};
+//# sourceURL=kadence-navigation-js-extra
+</script>
+<script id="kadence-navigation-js" src="https://www.open-electronics.org/wp-content/themes/kadence/assets/js/navigation.min.js?ver=1.5.2" async></script>
+<script id="sourcebuster-js-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/sourcebuster/sourcebuster.min.js?ver=11.2.0"></script>
+<script id="wc-order-attribution-js-extra">
+var wc_order_attribution = {"params":{"lifetime":1.0e-5,"session":30,"base64":false,"ajaxurl":"https://www.open-electronics.org/wp-admin/admin-ajax.php","prefix":"wc_order_attribution_","allowTracking":false},"fields":{"source_type":"current.typ","referrer":"current_add.rf","utm_campaign":"current.cmp","utm_source":"current.src","utm_medium":"current.mdm","utm_content":"current.cnt","utm_id":"current.id","utm_term":"current.trm","utm_source_platform":"current.plt","utm_creative_format":"current.fmt","utm_marketing_tactic":"current.tct","session_entry":"current_add.ep","session_start_time":"current_add.fd","session_pages":"session.pgs","session_count":"udata.vst","user_agent":"udata.uag"}};
+//# sourceURL=wc-order-attribution-js-extra
+</script>
+<script id="wc-order-attribution-js" src="https://www.open-electronics.org/wp-content/plugins/woocommerce/assets/js/frontend/order-attribution.min.js?ver=11.2.0"></script>
+<script id="oe-barra-categorie-js" src="https://www.open-electronics.org/wp-content/themes/openelectronics-verge/barra-categorie.js?ver=1789564004"></script>
+<script id="oe-galleria-js" src="https://www.open-electronics.org/wp-content/themes/openelectronics-verge/galleria.js?ver=1787995956"></script>
+<script id="bussola-suggerimenti-js-extra">
+var BussolaSuggerimenti = {"url":"https://www.open-electronics.org/wp-content/uploads/bussola/suggerimenti.txt?v=1791544684","testo":{"popolari":"Popular searches"},"anteprima":{"url":"https://www.open-electronics.org/wp-content/uploads/bussola/prodotti.txt?v=1791627422","motore":"https://www.open-electronics.org/wp-content/plugins/bussola/assets/anteprima.js?ver=1.2.1","quanti":5,"lettere":2,"prezzi":{"gruppi":[{"paesi":["AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR","HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"],"etichetta":"incl. VAT","divisore":1},{"paesi":[],"etichetta":"excl. VAT","divisore":1.22}],"predefinito":0,"paese_url":"https://www.open-electronics.org/cdn-cgi/trace"},"valuta":{"simbolo":"\u20ac","posizione":"left","decimali":2,"sep_dec":".","sep_mig":","},"cerca":"https://www.open-electronics.org/","clic":"https://www.open-electronics.org/wp-admin/admin-ajax.php","testo":{"prodotti":"Products","tutti":"See all results for \u201c%s\u201d","da":"From","esaurito":"Out of stock","ricerche":"Searches"}}};
+//# sourceURL=bussola-suggerimenti-js-extra
+</script>
+<script id="bussola-suggerimenti-js" src="https://www.open-electronics.org/wp-content/plugins/bussola/assets/suggerimenti.js?ver=1790350962"></script>
+<script id="wp-emoji-settings" type="application/json">
+{"baseUrl":"https://s.w.org/images/core/emoji/17.0.2/72x72/","ext":".png","svgUrl":"https://s.w.org/images/core/emoji/17.0.2/svg/","svgExt":".svg","source":{"concatemoji":"https://www.open-electronics.org/wp-includes/js/wp-emoji-release.min.js?ver=7.1.3"}}
+</script>
+<script type="module">
+/*! This file is auto-generated */
+var e="script#wp-emoji-settings",t=document.querySelector(e);if(!(t instanceof HTMLScriptElement))throw new Error("Element missing: "+e);const r=JSON.parse(t.text),s=(window._wpemojiSettings=r,"wpEmojiSettingsSupports"),o=["flag","emoji"];function i(e){try{var t={supportTests:e,timestamp:(new Date).valueOf()};sessionStorage.setItem(s,JSON.stringify(t))}catch(e){}}function c(e,t,n){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);t=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(n,0,0);const r=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);return t.every((e,t)=>e===r[t])}function p(e,t){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);var n=e.getImageData(16,16,1,1);for(let e=0;e<n.data.length;e++)if(0!==n.data[e])return!1;return!0}function u(e,t,n,r){switch(t){case"flag":return n(e,"\ud83c\udff3\ufe0f\u200d\u26a7\ufe0f","\ud83c\udff3\ufe0f\u200b\u26a7\ufe0f")?!1:!n(e,"\ud83c\udde8\ud83c\uddf6","\ud83c\udde8\u200b\ud83c\uddf6")&&!n(e,"\ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f","\ud83c\udff4\u200b\udb40\udc67\u200b\udb40\udc62\u200b\udb40\udc65\u200b\udb40\udc6e\u200b\udb40\udc67\u200b\udb40\udc7f");case"emoji":return!r(e,"\ud83e\u1fac8")}return!1}function f(e,t,n,r){let a;const s=(a="undefined"!=typeof WorkerGlobalScope&&self instanceof WorkerGlobalScope?new OffscreenCanvas(300,150):document.createElement("canvas")).getContext("2d",{willReadFrequently:!0}),o=(s.textBaseline="top",s.font="600 32px Arial",{});return e.forEach(e=>{o[e]=t(s,e,n,r)}),o}function a(e){var t=document.createElement("script");t.src=e,t.defer=!0,document.head.appendChild(t)}r.supports={everything:!0,everythingExceptFlag:!0},new Promise(t=>{let n=function(){try{var e=JSON.parse(sessionStorage.getItem(s));if("object"==typeof e&&"number"==typeof e.timestamp&&(new Date).valueOf()<e.timestamp+604800&&"object"==typeof e.supportTests)return e.supportTests}catch(e){}return null}();if(!n){if("undefined"!=typeof Worker&&"undefined"!=typeof OffscreenCanvas&&"undefined"!=typeof URL&&URL.createObjectURL&&"undefined"!=typeof Blob)try{var e="postMessage("+f.toString()+"("+[JSON.stringify(o),u.toString(),c.toString(),p.toString()].join(",")+"));",r=new Blob([e],{type:"text/javascript"});const a=new Worker(URL.createObjectURL(r),{name:"wpTestEmojiSupports"});return void(a.onmessage=e=>{i(n=e.data),a.terminate(),t(n)})}catch(e){}i(n=f(o,u,c,p))}t(n)}).then(e=>{for(const n in e)r.supports[n]=e[n],r.supports.everything=r.supports.everything&&r.supports[n],"flag"!==n&&(r.supports.everythingExceptFlag=r.supports.everythingExceptFlag&&r.supports[n]);var t;r.supports.everythingExceptFlag=r.supports.everythingExceptFlag&&!r.supports.flag,r.supports.everything||((t=r.source||{}).concatemoji?a(t.concatemoji):t.wpemoji&&t.twemoji&&(a(t.twemoji),a(t.wpemoji)))});
+//# sourceURL=https://www.open-electronics.org/wp-includes/js/wp-emoji-loader.min.js
+</script>
+</body>
+</html>
