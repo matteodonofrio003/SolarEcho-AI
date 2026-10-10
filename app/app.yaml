@@ -1,5 +1,7 @@
 name: SolarEcho-AI
 description: Acquisizione locale della risposta vibrazionale di un pannello fotovoltaico.
 icon: "😀"
-ports: []
-bricks: []
+ports:
+  - 7000
+bricks:
+  - arduino:web_ui

@@ -1,7 +1,31 @@
 #include <Arduino_Modulino.h>
 #include <Arduino_RouterBridge.h>
 #include <stdio.h>
+#include <atomic>
 #include "ina219_monitor.h"
+
+// LED rosso esterno: D3 -> resistenza 1 kohm -> anodo LED; catodo -> GND.
+// LED3_R integrato replica l'allerta (attivo LOW), senza componenti aggiuntivi.
+constexpr int kInspectionLedPin = D3;
+std::atomic<int> inspectionLedRequested{0};
+bool inspectionLedOn = false;
+
+int requestInspectionLed(int enabled) {
+  if (enabled != 0 && enabled != 1) return -1;
+  // Callback del thread RPC: solo memoria atomica, nessuna API Arduino/Serial/RPC.
+  inspectionLedRequested.store(enabled);
+  return 1;  // Conferma della richiesta, non ancora dell'uscita fisica.
+}
+
+void applyInspectionLed() {
+  const bool enabled = inspectionLedRequested.load() != 0;
+  if (enabled == inspectionLedOn) return;
+  digitalWrite(kInspectionLedPin, enabled ? HIGH : LOW);
+  digitalWrite(LED3_R, enabled ? LOW : HIGH);
+  inspectionLedOn = enabled;
+  Serial.println(enabled ? "INSPECTION: LED rosso ON; consultare il motivo in dashboard."
+                         : "INSPECTION: LED rosso OFF; allerta confermata/reset.");
+}
 
 // Piezo analogico: A0 deve ricevere un segnale condizionato e protetto 0..3,3 V.
 // La sola resistenza da 1 Mohm in parallelo al piezo NON protegge l'ADC.
@@ -13,6 +37,9 @@ ModulinoMovement movement;
 constexpr uint8_t kIna219Address = 0x40;
 constexpr float kIna219ShuntOhms = 0.1f;
 Ina219Monitor powerMonitor(Wire, kIna219Address, kIna219ShuntOhms);
+Ina219Monitor::Reading latestPower;
+Ina219Monitor::Result powerResult = Ina219Monitor::Result::NONE;
+bool havePower = false;
 
 void printPowerError(Ina219Monitor::Result result) {
   switch (result) {
@@ -39,6 +66,9 @@ void pollAndPrintPower() {
   Ina219Monitor::Reading reading;
   const Ina219Monitor::Result result = powerMonitor.poll(reading);
   if (result == Ina219Monitor::Result::SAMPLE) {
+    latestPower = reading;
+    havePower = true;
+    powerResult = result;
     char line[240];
     snprintf(line, sizeof(line),
              "POWER t_ms=%lu V_IN=%.3f V V_OUT=%.3f V SHUNT=%.3f mV I=%.2f mA P_IN=%.5f W P_OUT=%.5f W",
@@ -46,6 +76,10 @@ void pollAndPrintPower() {
              reading.shunt_mv, reading.current_ma, reading.input_power_w, reading.output_power_w);
     Serial.println(line);
   } else {
+    if (result != Ina219Monitor::Result::NONE) {
+      powerResult = result;
+      havePower = false;
+    }
     printPowerError(result);
   }
 }
@@ -61,6 +95,7 @@ constexpr uint16_t kPiezoThresholdOn = 512;  // Soglie diagnostiche da calibrare
 constexpr uint16_t kPiezoThresholdOff = 256;
 constexpr uint32_t kPiezoLockoutMs = 800;
 constexpr uint32_t kSerialPeriodMs = 200;  // Anteprima a 5 Hz.
+constexpr uint32_t kTelemetryPeriodMs = 1000;  // Web: solo IDLE, massimo 1 Hz.
 
 uint32_t piezoThresholdCrossings = 0;
 uint32_t piezoEvents = 0;
@@ -147,6 +182,8 @@ float latestY = 0;
 float latestZ = 0;
 uint32_t lastAccelerationMs = 0;
 uint32_t lastSerialMs = 0;
+uint32_t lastTelemetryMs = 0;
+bool ackFailed = false;
 
 enum class State { IDLE, CAPTURING, SENDING, WAIT_ACK };
 State state = State::IDLE;
@@ -164,6 +201,32 @@ bool readyForImpact() {
   if (hasPiezoEvent && millis() - lastPiezoEventMs < kPiezoLockoutMs) return false;
   const size_t oldest = (preHead + kPreSamples - preCount) % kPreSamples;
   return micros() - preSamples[oldest].timestamp_us >= kPreTriggerUs;
+}
+
+void publishTelemetry() {
+  // Un solo messaggio compatto: niente RPC durante CAPTURING/SENDING/WAIT_ACK.
+  // Le letture sono un'anteprima, non la forma d'onda acquisita a ~104 Hz.
+  if (state != State::IDLE || (!autoEnabled && !ackFailed)
+      || millis() - lastTelemetryMs < kTelemetryPeriodMs) return;
+  lastTelemetryMs = millis();
+  const bool imuOk = sensorReady && haveAcceleration && millis() - lastAccelerationMs < 500;
+  char payload[640];
+  const int length = snprintf(payload, sizeof(payload),
+      "{\"t_ms\":%lu,\"ready\":%u,\"imu_ok\":%u,\"ack_error\":%u,"
+      "\"ax\":%.5f,\"ay\":%.5f,\"az\":%.5f,\"adc\":%u,\"peak\":%u,"
+      "\"active\":%u,\"raw\":%lu,\"events\":%lu,\"suppressed\":%lu,"
+      "\"power_ok\":%u,\"power_error\":%u,\"power_t_ms\":%lu,"
+      "\"v_in\":%.4f,\"v_out\":%.4f,\"shunt_mv\":%.3f,\"current_ma\":%.3f,\"power_w\":%.6f,"
+      "\"led_on\":%u,\"led_requested\":%u}",
+      (unsigned long)millis(), (unsigned)readyForImpact(), (unsigned)imuOk, (unsigned)ackFailed,
+      latestX, latestY, latestZ, (unsigned)piezoAdc, (unsigned)piezoSerialPeak,
+      (unsigned)piezoActive, (unsigned long)piezoThresholdCrossings,
+      (unsigned long)piezoEvents, (unsigned long)piezoSuppressedCrossings,
+      (unsigned)havePower, (unsigned)powerResult, (unsigned long)latestPower.timestamp_ms,
+      latestPower.source_v, latestPower.bus_v, latestPower.shunt_mv,
+      latestPower.current_ma, latestPower.input_power_w,
+      (unsigned)inspectionLedOn, (unsigned)inspectionLedRequested.load());
+  if (length > 0 && (size_t)length < sizeof(payload)) Bridge.notify("solarecho_live", payload);
 }
 
 void beginImpactCapture() {
@@ -208,6 +271,14 @@ int acknowledgeCapture(int receivedId) {
 }
 
 void setup() {
+  pinMode(kInspectionLedPin, OUTPUT);
+  digitalWrite(kInspectionLedPin, LOW);
+  pinMode(LED3_R, OUTPUT);
+  pinMode(LED3_G, OUTPUT);
+  pinMode(LED3_B, OUTPUT);
+  digitalWrite(LED3_R, HIGH);
+  digitalWrite(LED3_G, HIGH);
+  digitalWrite(LED3_B, HIGH);
   // Richiede protezione hardware; ingresso riferito a GND, senza bias a meta' scala.
   pinMode(kPiezoPin, INPUT);
   analogReadResolution(14);  // 0..16383, riferimento predefinito 3,3 V.
@@ -222,11 +293,13 @@ void setup() {
   Wire.begin();  // INA219 su SDA/D20 e SCL/D21; livelli logici a 3,3 V.
   Serial.println("INA219: Wire/SDA/SCL, address=0x40, R_SHUNT=0.100 ohm (R100), stampa circa 1 Hz.");
   Serial.println("POWER: V_IN su VIN+, V_OUT su VIN-; I positiva da VIN+ a VIN-. Posizione nel circuito da annotare.");
-  printPowerError(powerMonitor.begin());
+  powerResult = powerMonitor.begin();
+  printPowerError(powerResult);
   if (!sensorReady) Serial.println("SENSOR ERROR: Modulino Movement non inizializzato.");
   resumedAtMs = millis();
   Bridge.provide_safe("solarecho_arm", armCapture);
   Bridge.provide_safe("solarecho_ack", acknowledgeCapture);
+  Bridge.provide("solarecho_inspection_led", requestInspectionLed);
 }
 
 void loop() {
@@ -302,12 +375,15 @@ void loop() {
   }
 
   if (state == State::WAIT_ACK && millis() - waitAckSinceMs >= kAckTimeoutMs) {
+    ackFailed = true;
     autoEnabled = false;
     resumeMonitoring();
     Serial.println("SENSOR ERROR: nessuna conferma CSV da Python; riavviare la App.");
   }
 
   if (state == State::IDLE) {
+    // Le richieste durante una cattura restano in memoria fino alla ripresa.
+    applyInspectionLed();
     const bool ready = readyForImpact();
     if (ready && !readyAnnounced) {
       Serial.println("READY: far cadere una pallina; cattura automatica -200 ms / +2 s.");
@@ -316,6 +392,7 @@ void loop() {
     readyAnnounced = ready;
     // Le transazioni INA219 e le stampe avvengono soltanto fuori dalla cattura.
     pollAndPrintPower();
+    publishTelemetry();
   }
 
   // Una sola riga seriale a 5 Hz. Nessuna stampa durante cattura e trasferimento.

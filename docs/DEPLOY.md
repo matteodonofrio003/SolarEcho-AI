@@ -63,12 +63,24 @@ SSH/SCP possono chiedere la password nel terminale e, al primo accesso, la confe
 | `app/sketch/sketch.ino` | `/home/arduino/ArduinoApps/solarecho-ai/sketch/sketch.ino` |
 | `app/sketch/ina219_monitor.h` | `/home/arduino/ArduinoApps/solarecho-ai/sketch/ina219_monitor.h` |
 | `app/python/main.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/main.py` |
+| `app/python/dashboard.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/dashboard.py` |
+| `app/python/power_history.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/power_history.py` |
+| `app/python/electrical_demo.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/electrical_demo.py` |
+| `app/python/inspection_alert.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/inspection_alert.py` |
+| `app/assets/index.html` | `/home/arduino/ArduinoApps/solarecho-ai/assets/index.html` |
+| `app/assets/style.css` | `/home/arduino/ArduinoApps/solarecho-ai/assets/style.css` |
+| `app/assets/dashboard.js` | `/home/arduino/ArduinoApps/solarecho-ai/assets/dashboard.js` |
 
 Il deploy ferma SolarEcho se e attiva, salva i file precedenti dell'elenco in `.deploy-backups/<data_id>/` della stessa App e verifica il checksum SHA256 di ogni file trasferito prima di sostituirlo. Se un passaggio fallisce, l'App non viene riavviata; correggere l'errore e ripetere il deploy. I CSV nella cartella `data/` vengono conservati.
 
 La sincronizzazione avviene quando si esegue il comando. Dopo una modifica in questo repository il file non cambia automaticamente sulla scheda. Per evitare conflitti, usare il repository per modificare il codice e App Lab per eseguirlo e leggere i log. Eventuali nuove sorgenti richiedono l'aggiornamento dell'elenco `$files` nello script.
 
 `sketch.yaml` riproduce le versioni delle librerie della App con cui il team ha gia acquisito i dati. La versione del core resta gestita dall'installazione App Lab dell'UNO Q.
+
+Il manifest ora abilita il brick `arduino:web_ui` e la porta 7000. Dopo Run,
+aprire `http://<IP-della-UNO-Q>:7000` sulla stessa rete: vedere
+[la procedura dashboard](DASHBOARD.md). Anche gli asset web richiedono deploy
+e riavvio per essere aggiornati sulla scheda.
 
 ## Verifica effettuata
 

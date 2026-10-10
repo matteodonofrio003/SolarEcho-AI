@@ -24,7 +24,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $appRoot = Join-Path $PSScriptRoot 'app'
 $remoteRoot = "/home/arduino/ArduinoApps/$AppName"
-$files = @('app.yaml', 'sketch/sketch.yaml', 'sketch/sketch.ino', 'sketch/ina219_monitor.h', 'python/main.py')
+$files = @(
+    'app.yaml', 'sketch/sketch.yaml', 'sketch/sketch.ino', 'sketch/ina219_monitor.h',
+    'python/main.py', 'python/dashboard.py', 'python/power_history.py', 'python/electrical_demo.py',
+    'python/inspection_alert.py',
+    'assets/index.html', 'assets/style.css', 'assets/dashboard.js'
+)
 
 function Invoke-Checked {
     param([string]$Executable, [string[]]$Arguments)
@@ -108,7 +113,7 @@ if ($targetApp.Count -gt 0 -and $targetApp[0].status -notin @('stopped', 'uninit
 
 $deployId = (Get-Date -Format 'yyyyMMdd_HHmmss') + '_' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $backupRoot = "$remoteRoot/.deploy-backups/$deployId"
-Invoke-Board "mkdir -p '$remoteRoot/sketch' '$remoteRoot/python' '$backupRoot/sketch' '$backupRoot/python'" | Out-Null
+Invoke-Board "mkdir -p '$remoteRoot/sketch' '$remoteRoot/python' '$remoteRoot/assets' '$backupRoot/sketch' '$backupRoot/python' '$backupRoot/assets'" | Out-Null
 
 foreach ($file in $files) {
     $localFile = Join-Path $appRoot $file

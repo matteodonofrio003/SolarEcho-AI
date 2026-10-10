@@ -1,6 +1,10 @@
 """Cattura per impatto: pretrigger IMU, CSV e controllo della qualita' locale."""
 """prova ciao"""
 from arduino.app_utils import App, Bridge
+from dashboard import Dashboard
+from power_history import PowerHistory
+from electrical_demo import ElectricalDemo
+from inspection_alert import InspectionAlert
 
 import csv
 import json
@@ -23,13 +27,20 @@ armed = False
 halted = False
 next_arm_at = time.monotonic() + 1.0
 session_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
+power_history = PowerHistory(OUTPUT_DIR.parent / "power", session_id)
+electrical_demo = ElectricalDemo(OUTPUT_DIR.parent / "analysis", power_history)
+inspection = InspectionAlert(OUTPUT_DIR.parent / "analysis")
+dashboard = Dashboard(OUTPUT_DIR, session_id, power_history, electrical_demo, inspection)
+next_led_sync_at = 0.0
 
 
 def on_ready(previous_capture_id):
+    dashboard.set_phase("READY")
     messages.put(("ready", previous_capture_id))
 
 
 def on_begin(capture_id, count, pre_count, pre_us, post_us, trigger_adc, event_count):
+    dashboard.set_phase("TRANSFER")
     messages.put(("begin", capture_id, count, pre_count, pre_us, post_us,
                   trigger_adc, event_count))
 
@@ -123,32 +134,39 @@ Bridge.provide("solarecho_begin", on_begin)
 Bridge.provide("solarecho_sample", on_sample)
 Bridge.provide("solarecho_end", on_end)
 Bridge.provide("solarecho_ready", on_ready)
+Bridge.provide("solarecho_live", dashboard.telemetry)
 print("Acquisizione automatica: attendere READY prima di ogni impatto.")
+print("Dashboard Web UI: http://<IP-della-UNO-Q>:7000")
+print(f"Storico elettrico automatico: {power_history.path}")
 
 
 def finish_capture(count, overflow, additional_events, timed_out=False):
     global pending, halted
     capture_id = pending["event_id"]
     try:
-        save_capture(pending, count, overflow, additional_events, timed_out)
+        destination = save_capture(pending, count, overflow, additional_events, timed_out)
+        dashboard.saved(destination)
     except OSError as error:
         halted = True
+        dashboard.fail(f"Salvataggio fallito: {error}. Acquisizione sospesa.")
         print(f"ERRORE salvataggio: {error}. Acquisizione sospesa; correggere e riavviare la App.")
     else:
         try:
             result = Bridge.call("solarecho_ack", capture_id)
             if result != 1:
                 halted = True
+                dashboard.fail("Conferma CSV rifiutata dal firmware. Riavviare la App.")
                 print("ERRORE conferma CSV: firmware non in attesa. Riavviare la App.")
         except Exception as error:
             halted = True
+            dashboard.fail(f"Errore Bridge durante conferma CSV: {error}")
             print(f"ERRORE Bridge durante conferma CSV: {error}. Riavviare la App.")
     closed_ids.add(capture_id)
     pending = None
 
 
 def loop():
-    global pending, armed, halted, next_arm_at
+    global pending, armed, halted, next_arm_at, next_led_sync_at
 
     if not armed and not halted and time.monotonic() >= next_arm_at:
         next_arm_at = time.monotonic() + 1.0
@@ -158,6 +176,7 @@ def loop():
                 armed = True
             elif result == -1:
                 halted = True
+                dashboard.fail("Modulino non inizializzato. Controllare Qwiic e riavviare.")
                 print("SENSOR ERROR: Modulino non inizializzato. Controllare Qwiic e riavviare.")
         except Exception as error:
             print(f"Attesa firmware Bridge: {error}")
@@ -176,6 +195,7 @@ def loop():
                 if pending is not None:
                     print("ERRORE protocollo: inizio evento durante un trasferimento; riavviare la App.")
                     halted = True
+                    dashboard.fail("Inizio evento durante un trasferimento. Riavviare la App.")
                     continue
                 count, pre_count, pre_us, post_us, trigger_adc, event_count = payload
                 pending = dict(event_id=capture_id, expected_samples=count,
@@ -196,6 +216,20 @@ def loop():
         print("Timeout del trasferimento Bridge: controllare il log e la connessione.")
         finish_capture(pending["expected_samples"], True, 0, timed_out=True)
 
+    for row in power_history.flush():
+        electrical_demo.observe_row(row)
+        inspection.observe_row(row, electrical_demo.status())
+    electrical_demo.tick()
+    if armed and not halted and pending is None and time.monotonic() >= next_led_sync_at:
+        desired_led = dashboard.led_request()
+        if desired_led is not None:
+            next_led_sync_at = time.monotonic() + 2.0
+            try:
+                result = Bridge.call("solarecho_inspection_led", desired_led, timeout=1.0)
+                if result != 1:
+                    print("LED: richiesta rifiutata; controllare firmware e telemetria.")
+            except Exception as error:
+                print(f"LED: sincronizzazione non riuscita; nuovo tentativo alla ripresa: {error}")
     time.sleep(0.05)
 
 

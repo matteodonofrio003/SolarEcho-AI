@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SolarEcho AI · Monitoraggio pannello</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/dashboard.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-icon" aria-hidden="true">◉</span><div>SolarEcho <strong>AI</strong><small>MONITORAGGIO DEL PANNELLO</small></div></div>
+    <div class="connection"><span id="connection-dot" class="dot"></span><span id="connection">Connessione…</span></div>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">BEYOND SOLAR / HACKTURIN 2026</p><h1>Ascoltiamo il pannello.</h1><p class="muted">Energia prodotta e risposta alle vibrazioni, direttamente dalla UNO Q.</p></div>
+      <span id="ai-chip" class="chip">AI non attiva</span>
+    </section>
+
+    <section class="status-strip" aria-live="polite">
+      <div><span id="phase" class="badge">AVVIO</span><span id="status-detail">In attesa dei sensori.</span></div>
+      <span id="telemetry-age" class="muted">Nessuna lettura</span>
+    </section>
+    <p id="error" class="error" hidden></p>
+
+    <section id="inspection-panel" class="card inspection-panel" aria-live="polite">
+      <div class="section-title"><h2 id="inspection-title">Segnalazione di ispezione</h2><span id="inspection-led" class="badge">LED in attesa</span></div>
+      <p id="inspection-reason" class="muted">Acquisisci il riferimento elettrico prima degli impatti.</p>
+      <p id="inspection-progress" class="caption">In attesa delle misure.</p>
+      <form id="inspection-form" class="economic-form">
+        <label>Impatti dopo il riferimento<input id="inspection-impacts" type="number" min="1" max="1000" step="1" required></label>
+        <label>Calo minimo di potenza (%)<input id="inspection-drop" type="number" min="1" max="100" step="any" required></label>
+        <label>Letture consecutive sotto soglia<input id="inspection-samples" type="number" min="2" max="120" step="1" required></label>
+        <div class="economic-save"><button id="inspection-save" class="button secondary" type="submit">Salva soglie LED</button><button id="inspection-reset" class="button" type="button" disabled>Conferma / reset allerta</button></div>
+      </form>
+      <p id="inspection-error" class="error" hidden></p>
+      <p class="caption">Soglie iniziali per la demo, da calibrare. Il calo può dipendere da ombra, luce o carico: non dimostra un danno causato dagli impatti. L’allerta resta attiva fino al reset; se la condizione persiste si riaccende. Il modello AI è attualmente sospeso.</p>
+    </section>
+
+    <section class="metrics" aria-label="Misure elettriche e impatti">
+      <article class="card metric"><span class="label">TENSIONE PANNELLO</span><div class="value"><span id="voltage">—</span><small>V</small></div><p>VIN+ rispetto a GND</p></article>
+      <article class="card metric"><span class="label">CORRENTE</span><div class="value"><span id="current">—</span><small>mA</small></div><p>Pannello → solar charger</p></article>
+      <article class="card metric highlight"><span class="label">POTENZA PANNELLO</span><div class="value"><span id="power">—</span><small>mW</small></div><p id="power-detail">In attesa dell’INA219</p></article>
+      <article class="card metric"><span class="label">IMPATTI RILEVATI</span><div class="value"><span id="impacts">—</span></div><p>Contatore della sessione firmware</p></article>
+    </section>
+
+    <section class="overview">
+      <article class="card">
+        <div class="section-title"><h2>Storico elettrico</h2><span class="muted">Salvataggio automatico sulla UNO Q</span></div>
+        <div class="history-controls"><label for="power-session">Sessione</label><select id="power-session"><option value="">In attesa della prima misura</option></select></div>
+        <div class="history-actions"><label class="option"><input type="checkbox" id="power-follow" checked> Segui sessione corrente</label><select id="power-quantity" aria-label="Grandezza elettrica"><option value="3">Potenza · mW</option><option value="1">Tensione · V</option><option value="2">Corrente · mA</option></select><a id="power-download" class="button" hidden>Scarica storico CSV</a></div>
+        <p id="power-log-status" class="caption" aria-live="polite">In attesa della registrazione.</p>
+        <p id="power-history-error" class="error" hidden></p>
+        <canvas id="power-chart" class="power-chart" role="img" aria-label="Misure elettriche salvate nel tempo"></canvas>
+        <p id="power-history-info" class="caption">Il grafico mostra fino a 600 letture; il CSV contiene l’intera sessione.</p>
+        <p class="caption">Tempo dalla partenza dell’App (s). Le pause restano vuote; i valori negativi mantengono il segno della misura.</p>
+      </article>
+      <article class="card sensors">
+        <div class="section-title"><h2>Sensori live</h2><span class="muted">Anteprima ~1 Hz</span></div>
+        <div class="axes"><div><span class="axis x">X</span><strong id="ax">—</strong><small>g</small></div><div><span class="axis y">Y</span><strong id="ay">—</strong><small>g</small></div><div><span class="axis z">Z</span><strong id="az">—</strong><small>g</small></div></div>
+        <dl><div><dt>Piezo A0 · ADC / picco</dt><dd id="piezo">—</dd></div><div><dt>Piezo sopra soglia</dt><dd id="piezo-active">—</dd></div><div><dt>Fronti / soppressi dal lockout</dt><dd id="crossings">—</dd></div><div><dt>INA219</dt><dd id="ina-state">In attesa</dd></div></dl>
+        <p class="caption">X/Y/Z includono la gravità. Questa anteprima non rappresenta la forma d’onda dell’impatto.</p>
+      </article>
+    </section>
+
+    <section class="card electrical-demo">
+      <div class="section-title"><div><p class="eyebrow">CONFRONTO ELETTRICO CONTROLLATO</p><h2>Quanto cambia la produzione?</h2></div><span class="chip">Oscuramento simulato</span></div>
+      <p class="muted">Mantieni illuminazione, posizione e carico invariati. Acquisisci il riferimento, avvia il confronto e poi copri una parte del pannello.</p>
+      <div class="demo-actions"><button id="reference-button" class="button" type="button">1. Acquisisci riferimento</button><button id="comparison-start" class="button" type="button" disabled>2. Avvia confronto</button><button id="comparison-stop" class="button secondary" type="button" disabled>3. Termina e salva</button><a id="comparison-report" class="button secondary" href="/api/economics/report" hidden>Scarica report JSON</a></div>
+      <p id="demo-status" class="muted" aria-live="polite">In attesa del riferimento.</p>
+      <p id="demo-error" class="error" hidden></p>
+      <div class="demo-metrics"><div><span class="label">RIFERIMENTO</span><strong><span id="reference-power">—</span> <small>mW</small></strong></div><div><span class="label">POTENZA RECENTE</span><strong><span id="comparison-power">—</span> <small>mW</small></strong></div><div><span class="label">RIDUZIONE LIVE</span><strong><span id="live-reduction">—</span> <small>%</small></strong></div><div><span class="label">RIDUZIONE SUL PERIODO</span><strong><span id="period-reduction">—</span> <small>%</small></strong></div></div>
+      <dl class="energy-summary"><div><dt>Energia misurata negli intervalli coperti</dt><dd id="measured-energy">—</dd></div><div><dt>Energia attesa mantenendo il riferimento costante</dt><dd id="reference-energy">—</dd></div><div><dt>Deficit netto stimato rispetto al riferimento</dt><dd id="deficit-energy">—</dd></div><div><dt>Valore ipotetico del deficit alle tariffe impostate</dt><dd id="deficit-value">—</dd></div><div><dt>Tempo coperto dalle misure / durata confronto</dt><dd id="comparison-coverage">—</dd></div></dl>
+      <p class="caption">Una riduzione negativa indica un aumento rispetto al riferimento. Le pause e i flussi inversi sono esclusi dal confronto energetico. Questo test non attribuisce una perdita a grandine o danni strutturali.</p>
+    </section>
+
+    <section class="card economic-scenario">
+      <div class="section-title"><div><p class="eyebrow">IMPATTO ECONOMICO</p><h2>Scenario domestico ipotetico</h2></div><span class="chip">Ipotesi modificabili</span></div>
+      <p class="muted">I valori iniziali sono esempi. Inserisci produzione e prezzi del tuo contratto, con costi variabili per kWh e senza quote fisse. La stessa riduzione su un impianto domestico è un’ipotesi da verificare.</p>
+      <form id="economic-form" class="economic-form">
+        <label>Produzione abituale (kWh/giorno)<input id="scenario-daily" name="daily_kwh" type="number" min="0.001" max="100000" step="any" required></label>
+        <label>Durata ipotizzata (giorni)<input id="scenario-days" name="days" type="number" min="1" max="3650" step="1" required></label>
+        <label>Quota di energia persa destinata all’autoconsumo (%)<input id="scenario-self" name="self_consumption_pct" type="number" min="0" max="100" step="any" required></label>
+        <label>Costo variabile di acquisto (€/kWh)<input id="scenario-buy" name="buy_eur_kwh" type="number" min="0" max="10" step="any" required></label>
+        <label>Valore dell’energia ceduta (€/kWh)<input id="scenario-sell" name="sell_eur_kwh" type="number" min="0" max="10" step="any" required></label>
+        <label>Riduzione da applicare<select id="scenario-mode" name="reduction_mode"><option value="measured">Dal periodo del confronto</option><option value="manual">Percentuale ipotizzata manualmente</option></select></label>
+        <label>Riduzione manuale (%)<input id="scenario-reduction" name="assumed_reduction_pct" type="number" min="0" max="100" step="any" required></label>
+        <div class="economic-save"><button id="economic-save" class="button" type="submit">Salva parametri</button><span id="economic-save-status" class="caption" aria-live="polite"></span></div>
+      </form>
+      <div class="demo-metrics scenario-values"><div><span class="label">RIDUZIONE IPOTIZZATA</span><strong><span id="scenario-effective">—</span> <small>%</small></strong></div><div><span class="label">ENERGIA MANCANTE</span><strong><span id="scenario-kwh">—</span> <small>kWh</small></strong></div><div><span class="label">MAGGIORE SPESA ACQUISTO</span><strong><span id="scenario-self-cost">—</span> <small>€</small></strong></div><div class="scenario-total"><span class="label">IMPATTO ECONOMICO TOTALE</span><strong><span id="scenario-total">—</span> <small>€</small></strong></div></div>
+      <p id="scenario-description" class="caption">Acquisisci un confronto oppure scegli una riduzione manuale per vedere lo scenario.</p>
+      <p class="caption">Il totale comprende maggiore spesa per autoconsumo perso e mancato ricavo dalla vendita. Non include riparazioni, incentivi o assicurazioni. Tariffe costanti per il periodo ipotizzato; nessun aggiornamento online automatico.</p>
+    </section>
+
+    <section class="card waveform">
+      <div class="section-title"><div><p class="eyebrow">RISPOSTA MECCANICA</p><h2>Forma d’onda dell’impatto</h2></div><label class="option"><input type="checkbox" id="follow" checked> Segui ultimo evento</label></div>
+      <div class="wave-controls"><label for="event-select">Evento</label><select id="event-select"><option value="">Nessun evento salvato</option></select><label class="option"><input type="checkbox" id="remove-offset" checked> Sottrai media pretrigger</label></div>
+      <p id="event-info" class="muted">Fai cadere la pallina solo quando il sistema indica READY.</p>
+      <canvas id="wave-chart" class="wave-chart" role="img" aria-label="Accelerazione X Y Z attorno al trigger piezo"></canvas>
+      <div class="chart-footer"><div class="legend"><span class="x">● X</span><span class="y">● Y</span><span class="z">● Z</span><span class="muted">Tempo dal trigger (ms) · accelerazione (g)</span></div><div class="downloads"><a id="csv-download" class="button" hidden>Scarica CSV</a><a id="json-download" class="button secondary" hidden>Metadati JSON</a></div></div>
+      <p id="event-reasons" class="error" hidden></p>
+      <p class="caption">La sottrazione dell’offset modifica solo il grafico. Il CSV scaricato conserva i dati originali.</p>
+    </section>
+
+    <section class="card archive">
+      <div class="section-title"><h2>Eventi salvati</h2><span id="event-count" class="muted">0 eventi</span></div>
+      <div class="table-scroll"><table><thead><tr><th>Evento</th><th>Qualità acquisizione</th><th>Campioni</th><th>Frequenza media</th><th>File</th></tr></thead><tbody id="events-body"><tr><td colspan="5" class="muted">In attesa delle acquisizioni.</td></tr></tbody></table></div>
+    </section>
+    <footer>Elaborazione locale · Nessun servizio cloud necessario<br>Il sistema registra variazioni meccaniche. Queste misure non certificano danni o microfratture.</footer>
+  </main>
+</body>
+</html>
