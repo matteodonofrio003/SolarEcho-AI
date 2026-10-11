@@ -27,7 +27,7 @@ impatti + calo non dimostra che gli impatti abbiano danneggiato il pannello.
 Per un comune LED rosso a due terminali, a scheda disalimentata:
 
 ```text
-UNO Q D3 ── resistenza 1 kohm ── anodo LED rosso
+UNO Q D7 ── resistenza 1 kohm ── anodo LED rosso
                                      catodo ── UNO Q GND
 ```
 
@@ -35,13 +35,13 @@ UNO Q D3 ── resistenza 1 kohm ── anodo LED rosso
 - Catodo: normalmente il terminale corto e il lato piatto del contenitore;
   se i terminali sono stati tagliati, verificare la polarita del componente.
 - La resistenza e **in serie**, non in parallelo.
-- D3 e un'uscita a 3,3 V: non collegare il LED al 5 V.
+- D7 e un'uscita a 3,3 V: non collegare il LED al 5 V.
 - Per un LED con caduta diretta di circa 2 V, la corrente e circa
   `(3,3 - 2) / 1000 = 1,3 mA`; il valore effettivo dipende dal LED.
 - Questo schema riguarda un LED indicatore semplice; moduli e LED di potenza
   richiedono la verifica della loro documentazione.
 
-D3 corrisponde a PB0 sull'header digitale secondo il
+D7 corrisponde a PB2 sull'header digitale secondo il
 [manuale ufficiale Arduino](https://docs.arduino.cc/resources/datasheets/ABX00162-ABX00173-datasheet.pdf)
 e il [manuale locale](UM.md). Il dimensionamento a bassa corrente e coerente
 con le caratteristiche GPIO del
