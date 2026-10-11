@@ -5,6 +5,7 @@ from dashboard import Dashboard
 from power_history import PowerHistory
 from electrical_demo import ElectricalDemo
 from inspection_alert import InspectionAlert
+from telegram_notifications import TelegramNotifications
 
 import csv
 import json
@@ -30,7 +31,8 @@ session_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
 power_history = PowerHistory(OUTPUT_DIR.parent / "power", session_id)
 electrical_demo = ElectricalDemo(OUTPUT_DIR.parent / "analysis", power_history)
 inspection = InspectionAlert(OUTPUT_DIR.parent / "analysis")
-dashboard = Dashboard(OUTPUT_DIR, session_id, power_history, electrical_demo, inspection)
+notifications = TelegramNotifications(OUTPUT_DIR.parent / "notifications")
+dashboard = Dashboard(OUTPUT_DIR, session_id, power_history, electrical_demo, inspection, notifications)
 next_led_sync_at = 0.0
 
 
@@ -167,6 +169,7 @@ def finish_capture(count, overflow, additional_events, timed_out=False):
 
 def loop():
     global pending, armed, halted, next_arm_at, next_led_sync_at
+    notifications.start()  # Thread avviato dopo App.run; inizializzazione rete fuori dal main.
 
     if not armed and not halted and time.monotonic() >= next_arm_at:
         next_arm_at = time.monotonic() + 1.0
@@ -233,4 +236,7 @@ def loop():
     time.sleep(0.05)
 
 
-App.run(user_loop=loop)
+try:
+    App.run(user_loop=loop)
+finally:
+    notifications.stop()

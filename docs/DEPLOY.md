@@ -12,7 +12,7 @@ Il codice sorgente si modifica nel repository sul PC. [deploy.ps1](../deploy.ps1
    .\deploy.ps1
    ```
 
-4. In App Lab tornare alla lista delle App e riaprire **SolarEcho-AI**. Premere **Run** quando si vuole eseguire il codice aggiornato.
+4. In App Lab tornare alla lista delle App e riaprire **SolarEcho-AI**. Riconfigurare il token nel brick Telegram Bot dopo il deploy (vedere [Telegram](TELEGRAM.md)), poi premere **Run** quando si vuole eseguire il codice aggiornato.
 
 Se Windows blocca lo script per l'execution policy, eseguirlo con una policy limitata al solo processo:
 
@@ -67,17 +67,24 @@ SSH/SCP possono chiedere la password nel terminale e, al primo accesso, la confe
 | `app/python/power_history.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/power_history.py` |
 | `app/python/electrical_demo.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/electrical_demo.py` |
 | `app/python/inspection_alert.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/inspection_alert.py` |
+| `app/python/telegram_notifications.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/telegram_notifications.py` |
 | `app/assets/index.html` | `/home/arduino/ArduinoApps/solarecho-ai/assets/index.html` |
 | `app/assets/style.css` | `/home/arduino/ArduinoApps/solarecho-ai/assets/style.css` |
 | `app/assets/dashboard.js` | `/home/arduino/ArduinoApps/solarecho-ai/assets/dashboard.js` |
 
 Il deploy ferma SolarEcho se e attiva, salva i file precedenti dell'elenco in `.deploy-backups/<data_id>/` della stessa App e verifica il checksum SHA256 di ogni file trasferito prima di sostituirlo. Se un passaggio fallisce, l'App non viene riavviata; correggere l'errore e ripetere il deploy. I CSV nella cartella `data/` vengono conservati.
 
+Le variabili dei brick configurate in App Lab possono contenere segreti nel
+manifest sulla scheda. Il deploy sostituisce `app.yaml` con il manifest senza
+segreti del repository: reinserire `TELEGRAM_BOT_TOKEN` nel brick dopo ogni deploy.
+Per questa configurazione usare `.\deploy.ps1` senza `-Start`, impostare il token,
+poi premere Run. Non copiare il manifest o i backup della scheda nel repository.
+
 La sincronizzazione avviene quando si esegue il comando. Dopo una modifica in questo repository il file non cambia automaticamente sulla scheda. Per evitare conflitti, usare il repository per modificare il codice e App Lab per eseguirlo e leggere i log. Eventuali nuove sorgenti richiedono l'aggiornamento dell'elenco `$files` nello script.
 
 `sketch.yaml` riproduce le versioni delle librerie della App con cui il team ha gia acquisito i dati. La versione del core resta gestita dall'installazione App Lab dell'UNO Q.
 
-Il manifest ora abilita il brick `arduino:web_ui` e la porta 7000. Dopo Run,
+Il manifest abilita i brick `arduino:web_ui`, `arduino:telegram_bot` e la porta 7000. Dopo Run,
 aprire `http://<IP-della-UNO-Q>:7000` sulla stessa rete: vedere
 [la procedura dashboard](DASHBOARD.md). Anche gli asset web richiedono deploy
 e riavvio per essere aggiornati sulla scheda.

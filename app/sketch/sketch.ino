@@ -4,9 +4,9 @@
 #include <atomic>
 #include "ina219_monitor.h"
 
-// LED rosso esterno: D3 -> resistenza 1 kohm -> anodo LED; catodo -> GND.
+// LED rosso esterno: D7 -> resistenza 1 kohm -> anodo LED; catodo -> GND.
 // LED3_R integrato replica l'allerta (attivo LOW), senza componenti aggiuntivi.
-constexpr int kInspectionLedPin = D3;
+constexpr int kInspectionLedPin = D7;
 std::atomic<int> inspectionLedRequested{0};
 bool inspectionLedOn = false;
 

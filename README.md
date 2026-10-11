@@ -23,10 +23,15 @@ integrazione dell'energia sui soli intervalli coperti e scenario domestico
 ipotetico con produzione/tariffe configurabili. Report JSON e parametri salvati
 localmente. Questa nuova parte e pronta per la verifica del team.
 
-Aggiunta la richiesta di ispezione con LED rosso su D3 e sul LED RGB 3
+Aggiunta la richiesta di ispezione con LED rosso su D7 e sul LED RGB 3
 integrato: calo persistente dopo un numero configurabile di impatti, allerta
 confermata dalla dashboard e stato salvato localmente. Predisposto l'hook per
 una futura anomalia AI reale; il modello resta sospeso. Da verificare sul banco.
+
+Aggiunta la segnalazione manuale via brick Telegram Bot: destinatario configurabile
+dalla dashboard, anteprima dei dati e storico locale degli invii con report JSON.
+Il token si configura solo sulla scheda dopo il deploy. L'integrazione Telegram
+e i suoi test software sono da eseguire e verificare dal team.
 
 Disponibile l'esportazione locale dei CSV per Edge Impulse: ricampionamento
 a 100 Hz, etichette esplicite e report degli eventi esclusi. Il convertitore
@@ -45,4 +50,5 @@ Compilazione e verifica fisica di questa integrazione sono affidate al team.
 - [Dashboard: avvio passo per passo e prima verifica](docs/DASHBOARD.md).
 - [Demo elettrica e calcolo dello scenario economico](docs/DEMO_ECONOMICA.md).
 - [LED rosso: collegamento, soglie e prova di ispezione](docs/LED_ISPEZIONE.md).
+- [Telegram: configurazione e invio dalla dashboard](docs/TELEGRAM.md).
 - [Stampa seriale X/Y/Z e piezo analogico su A0: protezioni e lettura](docs/SERIALE_PIEZO.md).

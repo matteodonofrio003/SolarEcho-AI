@@ -12,6 +12,8 @@ let currentPowerName = "", loggerError = "", powerAPIError = "";
 let economicSettingsLoaded = false;
 let demoActionPending = false, demoActionError = "", lastEconomics = null;
 let inspectionSettingsLoaded = false, inspectionPending = false, inspectionError = "";
+let telegramLoaded = false, telegramPending = false, telegramDirty = false;
+let telegramError = "", telegramRequestId = "", lastTelegram = null;
 
 async function getJSON(path, options = {}) {
   const controller = new AbortController();
@@ -75,6 +77,101 @@ function showStatus(data) {
   if (data.economics) showEconomics(data.economics);
   el("ai-chip").textContent = data.ai_enabled ? "Inferenza AI attiva" : "AI non attiva";
   if (data.inspection) showInspection(data.inspection, live, fresh);
+  if (data.telegram) showTelegram(data.telegram);
+}
+
+function showTelegram(data) {
+  lastTelegram = data;
+  if (!telegramLoaded) {
+    el("telegram-panel-id").value = data.settings.panel_id;
+    el("telegram-chat-id").value = data.settings.chat_id || "";
+    telegramLoaded = true;
+  }
+  const labels = {STARTING: "AVVIO", CONNECTING: "CONNESSIONE IN CORSO", READY: "PRONTO PER INVIO", ERROR: "NON DISPONIBILE", DISABLED: "TOKEN DA CONFIGURARE"};
+  el("telegram-connection").textContent = labels[data.connection] || data.connection;
+  el("telegram-connection").className = `badge ${data.connection === "READY" ? "ready" : "busy"}`;
+  const ready = data.connection === "READY";
+  el("telegram-send").disabled = telegramPending || telegramDirty || data.busy || !ready || !data.settings.chat_id || data.cooldown_s > 0;
+  el("telegram-save").disabled = telegramPending || data.busy;
+  el("telegram-reconnect").disabled = telegramPending || data.busy || !data.token_present || ["STARTING", "CONNECTING"].includes(data.connection);
+  el("telegram-preview-button").disabled = telegramPending;
+  const message = [telegramError, data.error, data.io_error].filter(Boolean).join(" ");
+  el("telegram-error").hidden = !message;
+  el("telegram-error").textContent = message;
+  el("telegram-status").textContent = telegramDirty ? "Modifiche non salvate: salva il destinatario prima di inviare."
+    : data.busy ? "Invio in corso nel servizio Telegram; il monitoraggio resta attivo."
+      : data.settings.chat_id ? `Destinatario salvato: ${data.settings.chat_id} · Pannello: ${data.settings.panel_id}`
+        : "Invia /start al bot dal telefono, poi inserisci e salva il Chat ID ricevuto.";
+  const diagnostic = el("telegram-diagnostic"); diagnostic.replaceChildren();
+  if (data.bot_username) {
+    const link = document.createElement("a");
+    link.href = `https://t.me/${encodeURIComponent(data.bot_username)}`;
+    link.target = "_blank"; link.rel = "noopener noreferrer";
+    link.textContent = `Bot collegato: @${data.bot_username}`; diagnostic.append(link);
+  }
+  if (data.last_command) {
+    const command = data.last_command;
+    const result = command.reply_ok == null ? "risposta in corso" : command.reply_ok ? "risposta inviata" : "risposta non confermata";
+    diagnostic.append(document.createTextNode(` · Ultimo /start: ${new Date(command.at_utc).toLocaleString("it-IT")} · Chat ID: ${command.chat_id} · ${result}`));
+  } else {
+    diagnostic.append(document.createTextNode(" · Nessun /start ricevuto in questa sessione."));
+  }
+  if (telegramRequestId && data.jobs.some((job) => job.id === telegramRequestId)) telegramRequestId = "";
+  const states = {QUEUED: "In attesa", SENDING: "Invio in corso", SENT: "Inviato", FAILED: "Invio non eseguito", UNCONFIRMED: "Esito non confermato"};
+  const body = el("telegram-history"); body.replaceChildren();
+  for (const job of data.jobs) {
+    const row = document.createElement("tr");
+    for (const value of [job.id.slice(0, 8), new Date(job.at_utc).toLocaleString("it-IT"), states[job.state] || job.state]) {
+      const cell = document.createElement("td"); cell.textContent = value; row.append(cell);
+    }
+    row.firstChild.title = job.id;
+    if (job.error) {
+      const detail = document.createElement("p"); detail.className = "caption"; detail.textContent = job.error;
+      row.children[2].append(detail);
+    }
+    const actions = document.createElement("td"), report = document.createElement("a");
+    report.href = `/api/telegram/report/${encodeURIComponent(job.id)}`;
+    report.textContent = "JSON"; report.className = "file-link"; actions.append(report);
+    if (["FAILED", "UNCONFIRMED"].includes(job.state)) {
+      const retry = document.createElement("button");
+      retry.type = "button"; retry.className = "event-link telegram-retry";
+      retry.textContent = job.state === "UNCONFIRMED" ? "Ripeti (possibile duplicato)" : "Ripeti";
+      retry.disabled = telegramPending || data.busy || !ready || job.chat_id !== data.settings.chat_id;
+      retry.onclick = () => telegramAction(`retry/${encodeURIComponent(job.id)}`);
+      actions.append(retry);
+    }
+    row.append(actions); body.append(row);
+  }
+  if (!data.jobs.length) {
+    const row = document.createElement("tr"), cell = document.createElement("td");
+    cell.colSpan = 4; cell.className = "muted"; cell.textContent = "Nessuna segnalazione inviata.";
+    row.append(cell); body.append(row);
+  }
+}
+
+async function telegramAction(endpoint, body = {}) {
+  if (telegramPending) return null;
+  telegramPending = true; telegramError = "";
+  if (lastTelegram) showTelegram(lastTelegram);
+  try {
+    const result = await getJSON(`/api/telegram/${endpoint}`, {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+    });
+    if (endpoint === "settings") {
+      telegramDirty = false;
+      el("telegram-panel-id").value = result.settings.panel_id;
+      el("telegram-chat-id").value = result.settings.chat_id;
+      el("telegram-preview").hidden = true;
+    }
+    showTelegram(result);
+    return result;
+  } catch (error) {
+    telegramError = `${error.message}. Controlla lo storico aggiornato prima di ripetere.`;
+    return null;
+  } finally {
+    telegramPending = false;
+    if (lastTelegram) showTelegram(lastTelegram);
+  }
 }
 
 function showInspection(data, live, fresh) {
@@ -429,6 +526,9 @@ async function poll() {
     el("power-detail").textContent = "Misura non disponibile";
     for (const id of ["reference-button", "comparison-start", "comparison-stop", "economic-save", "inspection-save", "inspection-reset"]) el(id).disabled = true;
     el("inspection-led").textContent = "LED: stato non aggiornato";
+    el("telegram-connection").textContent = "STATO NON AGGIORNATO";
+    for (const id of ["telegram-send", "telegram-save", "telegram-reconnect", "telegram-preview-button"]) el(id).disabled = true;
+    document.querySelectorAll(".telegram-retry").forEach((button) => { button.disabled = true; });
     el("comparison-power").textContent = "—";
     el("live-reduction").textContent = "—";
     el("demo-status").textContent = "UNO Q non raggiungibile: gli altri valori sono gli ultimi ricevuti. Il confronto continua se la App resta attiva.";
@@ -441,6 +541,34 @@ el("event-select").onchange = (event) => {
 };
 el("follow").onchange = () => { if (el("follow").checked && events.length) selectEvent(events[0].name); };
 el("remove-offset").onchange = drawWaveform;
+el("telegram-form").addEventListener("input", () => {
+  telegramDirty = true;
+  if (lastTelegram) showTelegram(lastTelegram);
+});
+el("telegram-form").onsubmit = (event) => {
+  event.preventDefault();
+  telegramAction("settings", {panel_id: el("telegram-panel-id").value, chat_id: el("telegram-chat-id").value});
+};
+el("telegram-reconnect").onclick = () => telegramAction("reconnect");
+el("telegram-send").onclick = () => {
+  if (telegramPending) return;
+  if (!telegramRequestId) {
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes); // Funziona anche sulla dashboard HTTP nella LAN.
+    telegramRequestId = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  telegramAction("send", {request_id: telegramRequestId});
+};
+el("telegram-preview-button").onclick = async () => {
+  try {
+    const preview = await getJSON("/api/telegram/preview");
+    el("telegram-preview").textContent = preview.text;
+    el("telegram-preview").hidden = false;
+  } catch (error) {
+    telegramError = `Anteprima non disponibile: ${error.message}`;
+    if (lastTelegram) showTelegram(lastTelegram);
+  }
+};
 el("inspection-reset").onclick = () => inspectionAction("reset");
 el("inspection-form").onsubmit = (event) => {
   event.preventDefault();

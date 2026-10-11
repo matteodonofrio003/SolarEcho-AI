@@ -11,13 +11,14 @@ import time
 from arduino.app_bricks.web_ui import WebUI
 from fastapi import HTTPException
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from telegram_notifications import utc_now
 
 
 EVENT_NAME = re.compile(r"\d{8}_\d{6}_[0-9a-f]{8}_event_\d+")
 
 
 class Dashboard:
-    def __init__(self, output_dir, session_id, power_history, electrical_demo, inspection):
+    def __init__(self, output_dir, session_id, power_history, electrical_demo, inspection, notifications):
         self.output_dir = Path(output_dir)
         self.lock = Lock()
         self.live = None
@@ -29,6 +30,7 @@ class Dashboard:
         self.power_history = power_history
         self.electrical_demo = electrical_demo
         self.inspection = inspection
+        self.notifications = notifications
         self.web = WebUI(assets_dir_path=str(Path(__file__).resolve().parent.parent / "assets"),
                          cors_origins="")
         self.web.expose_api("GET", "/api/status", self.status)
@@ -45,6 +47,12 @@ class Dashboard:
         self.web.expose_api("GET", "/api/economics/report", self.economic_report)
         self.web.expose_api("POST", "/api/inspection/reset", self.inspection_reset)
         self.web.expose_api("POST", "/api/inspection/settings", self.inspection_settings)
+        self.web.expose_api("GET", "/api/telegram/preview", self.telegram_preview)
+        self.web.expose_api("POST", "/api/telegram/settings", self.telegram_settings)
+        self.web.expose_api("POST", "/api/telegram/send", self.telegram_send)
+        self.web.expose_api("POST", "/api/telegram/reconnect", self.telegram_reconnect)
+        self.web.expose_api("POST", "/api/telegram/retry/{request_id}", self.telegram_retry)
+        self.web.expose_api("GET", "/api/telegram/report/{request_id}", self.telegram_report)
 
     def telemetry(self, payload):
         """Callback Bridge corto; mantiene soltanto l'ultima anteprima."""
@@ -114,7 +122,58 @@ class Dashboard:
                 "telemetry_age_s": age, "live": data, "last_event": last_event,
                 "ai_enabled": inspection["ai_enabled"], "inspection": inspection,
                 "power_history": self.power_history.status(),
+                "telegram": self.notifications.status(),
                 "economics": self.electrical_demo.status()}
+
+    def panel_snapshot(self):
+        """Foto dei valori disponibili, senza interrogare MCU, rete o forme d'onda."""
+        data = self.status()
+        live, age = data["live"], data["telemetry_age_s"]
+        fresh = bool(live and age is not None and age < 1.8 and data["phase"] != "TRANSFER")
+        power_age = ((live["t_ms"] - live["power_t_ms"]) % (2 ** 32) / 1000 + age) if live and age is not None else None
+        power_valid = bool(fresh and live["power_ok"] == 1 and live["power_error"] == 1 and power_age < 3)
+        imu_valid = bool(fresh and live["imu_ok"])
+        economics = data["economics"]
+        reference = economics["reference_w"]
+        inspection = copy.deepcopy(data["inspection"])
+        if not fresh:
+            inspection["impacts_since_reference"] = None
+        return {"at_utc": utc_now(), "session_id": data["session_id"], "phase": data["phase"],
+                "error": data["error"], "last_event": data["last_event"],
+                "telemetry_age_s": age, "impacts": live["events"] if fresh else None,
+                "inspection": inspection,
+                "power": {"valid": power_valid, "age_s": power_age,
+                          "voltage_v": live["v_in"] if power_valid else None,
+                          "current_ma": live["current_ma"] if power_valid else None,
+                          "power_mw": live["power_w"] * 1000 if power_valid else None},
+                "imu": {"valid": imu_valid,
+                        "ax_g": live["ax"] if imu_valid else None,
+                        "ay_g": live["ay"] if imu_valid else None,
+                        "az_g": live["az"] if imu_valid else None},
+                "economics": {"reference_mw": reference * 1000 if reference is not None else None,
+                              "live_reduction_pct": economics["live_reduction_pct"] if power_valid else None,
+                              "scenario": economics["scenario"],
+                              "scenario_days": economics["settings"]["days"]}}
+
+    def telegram_preview(self):
+        return self.notifications.preview(self.panel_snapshot())
+
+    def telegram_settings(self, settings: dict):
+        return self._economic_call(self.notifications.update_settings, settings)
+
+    def telegram_send(self, request: dict):
+        return self._economic_call(self.notifications.submit, request.get("request_id"), self.panel_snapshot())
+
+    def telegram_reconnect(self):
+        return self._economic_call(self.notifications.reconnect)
+
+    def telegram_retry(self, request_id: str):
+        return self._economic_call(self.notifications.retry, request_id)
+
+    def telegram_report(self, request_id: str):
+        report = self._economic_call(self.notifications.report, request_id)
+        return JSONResponse(report, headers={"Content-Disposition": f'attachment; filename="notification_{report["id"]}.json"',
+                                             "Cache-Control": "no-store"})
 
     @staticmethod
     def _economic_call(action, *args):

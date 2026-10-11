@@ -28,6 +28,7 @@ $files = @(
     'app.yaml', 'sketch/sketch.yaml', 'sketch/sketch.ino', 'sketch/ina219_monitor.h',
     'python/main.py', 'python/dashboard.py', 'python/power_history.py', 'python/electrical_demo.py',
     'python/inspection_alert.py',
+    'python/telegram_notifications.py',
     'assets/index.html', 'assets/style.css', 'assets/dashboard.js'
 )
 
@@ -135,6 +136,7 @@ foreach ($file in $files) {
 }
 
 Write-Host "Deploy completato e verificato. Backup: $backupRoot"
+Write-Host 'Il manifest e stato sostituito: riconfigurare TELEGRAM_BOT_TOKEN nel brick Telegram Bot in App Lab prima di Run. Non salvare il token nel repository.'
 if ($Start) {
     Write-Host 'Compilazione e avvio SolarEcho...'
     Invoke-Board "arduino-app-cli app start '$appId'" | Write-Host

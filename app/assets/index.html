@@ -38,6 +38,23 @@
       <p class="caption">Soglie iniziali per la demo, da calibrare. Il calo può dipendere da ombra, luce o carico: non dimostra un danno causato dagli impatti. L’allerta resta attiva fino al reset; se la condizione persiste si riaccende. Il modello AI è attualmente sospeso.</p>
     </section>
 
+    <section class="card telegram-panel">
+      <div class="section-title"><h2>Segnalazione via Telegram</h2><span id="telegram-connection" class="badge">In attesa</span></div>
+      <p class="muted">Invia i dati del pannello alla tua chat di test. Dal telefono, invia <strong>/start</strong> al bot per conoscere il Chat ID, poi salvalo qui.</p>
+      <form id="telegram-form" class="economic-form">
+        <label>Identificativo pannello<input id="telegram-panel-id" type="text" maxlength="64" required></label>
+        <label>Chat ID della chat privata<input id="telegram-chat-id" type="text" inputmode="numeric" pattern="[1-9][0-9]{0,15}" placeholder="Chat ID restituito dal bot" required></label>
+        <div class="economic-save"><button id="telegram-save" class="button secondary" type="submit">Salva destinatario</button><button id="telegram-reconnect" class="button secondary" type="button">Riconnetti</button></div>
+      </form>
+      <div class="demo-actions"><button id="telegram-preview-button" class="button secondary" type="button">Anteprima dati</button><button id="telegram-send" class="button" type="button" disabled>Invia segnalazione</button></div>
+      <pre id="telegram-preview" class="telegram-preview" hidden></pre>
+      <p id="telegram-status" class="caption" aria-live="polite">Configura il destinatario. Il token resta nel campo segreto del brick in App Lab.</p>
+      <p id="telegram-diagnostic" class="caption" aria-live="polite"></p>
+      <p id="telegram-error" class="error" hidden></p>
+      <div class="table-scroll"><table><thead><tr><th>Richiesta</th><th>Data</th><th>Esito</th><th>Azioni</th></tr></thead><tbody id="telegram-history"></tbody></table></div>
+      <p class="caption">Invio soltanto su richiesta. "Inviato" indica accettazione da Telegram, non lettura dell'operatore. Se l'esito non è confermato, controlla la chat prima di riprovare: potrebbero arrivare duplicati. I dati mancanti restano indicati come non disponibili.</p>
+    </section>
+
     <section class="metrics" aria-label="Misure elettriche e impatti">
       <article class="card metric"><span class="label">TENSIONE PANNELLO</span><div class="value"><span id="voltage">—</span><small>V</small></div><p>VIN+ rispetto a GND</p></article>
       <article class="card metric"><span class="label">CORRENTE</span><div class="value"><span id="current">—</span><small>mA</small></div><p>Pannello → solar charger</p></article>

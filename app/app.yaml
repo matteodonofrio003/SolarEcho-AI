@@ -5,3 +5,4 @@ ports:
   - 7000
 bricks:
   - arduino:web_ui
+  - arduino:telegram_bot
