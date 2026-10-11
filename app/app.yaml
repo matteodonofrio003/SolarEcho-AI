@@ -6,3 +6,5 @@ ports:
 bricks:
   - arduino:web_ui
   - arduino:telegram_bot
+  - arduino:vibration_anomaly_detection:
+      model: ei-model-1136239-1

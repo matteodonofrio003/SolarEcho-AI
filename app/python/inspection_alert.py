@@ -35,7 +35,7 @@ class InspectionAlert:
                 settings = self._validate(saved["settings"])
                 alert = saved.get("alert")
                 if alert is not None and (not isinstance(alert, dict)
-                        or alert.get("reason") not in ("ELECTRICAL_DECLINE", "AI_ANOMALY")
+                        or alert.get("reason") not in ("ELECTRICAL_DECLINE", "AI_ANOMALY", "AI_TEST")
                         or not isinstance(alert.get("at_utc"), str)
                         or not isinstance(alert.get("evidence"), dict)):
                     raise ValueError("Allerta salvata non valida")
@@ -162,18 +162,23 @@ class InspectionAlert:
                     "power_session_id": row[0], "measurement_timestamp_ms": stamp,
                 })
 
-    def on_ai_result(self, score, threshold, event_name, *, comparable):
-        """Hook per un'inferenza reale futura; non addestra e non simula un modello."""
+    def on_ai_result(self, score, threshold, event_name, *, comparable,
+                     synthetic=False, model_id=None, inference_id=None):
+        """Score firmato K-means; origine sintetica esplicita anche nell'allerta."""
         if not isinstance(comparable, bool) or not isinstance(event_name, str):
             raise ValueError("Indicare evento e confrontabilita della cattura")
         if any(isinstance(v, bool) or not isinstance(v, (int, float))
-               or not math.isfinite(v) or v < 0 for v in (score, threshold)):
-            raise ValueError("Score e soglia AI devono essere numerici, finiti e non negativi")
+               or not math.isfinite(v) for v in (score, threshold)):
+            raise ValueError("Score e soglia AI devono essere numerici e finiti")
+        if not isinstance(synthetic, bool):
+            raise ValueError("Origine sintetica non valida")
         with self.lock:
             self.ai_enabled = True
-            if comparable and score > threshold:
-                self._latch("AI_ANOMALY", {"event": event_name, "score": score,
-                                          "threshold": threshold})
+            if comparable and score >= threshold:
+                self._latch("AI_TEST" if synthetic else "AI_ANOMALY", {
+                    "event": event_name, "score": score, "threshold": threshold,
+                    "synthetic": synthetic, "model_id": model_id,
+                    "inference_id": inference_id, "experimental": True})
 
     def desired_led(self):
         with self.lock:

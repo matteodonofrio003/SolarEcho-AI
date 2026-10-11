@@ -18,7 +18,7 @@ EVENT_NAME = re.compile(r"\d{8}_\d{6}_[0-9a-f]{8}_event_\d+")
 
 
 class Dashboard:
-    def __init__(self, output_dir, session_id, power_history, electrical_demo, inspection, notifications):
+    def __init__(self, output_dir, session_id, power_history, electrical_demo, inspection, notifications, vibration_ai):
         self.output_dir = Path(output_dir)
         self.lock = Lock()
         self.live = None
@@ -31,6 +31,7 @@ class Dashboard:
         self.electrical_demo = electrical_demo
         self.inspection = inspection
         self.notifications = notifications
+        self.vibration_ai = vibration_ai
         self.web = WebUI(assets_dir_path=str(Path(__file__).resolve().parent.parent / "assets"),
                          cors_origins="")
         self.web.expose_api("GET", "/api/status", self.status)
@@ -53,6 +54,10 @@ class Dashboard:
         self.web.expose_api("POST", "/api/telegram/reconnect", self.telegram_reconnect)
         self.web.expose_api("POST", "/api/telegram/retry/{request_id}", self.telegram_retry)
         self.web.expose_api("GET", "/api/telegram/report/{request_id}", self.telegram_report)
+        self.web.expose_api("POST", "/api/ai/settings", self.ai_settings)
+        self.web.expose_api("POST", "/api/ai/analyze", self.ai_analyze)
+        self.web.expose_api("POST", "/api/ai/synthetic", self.ai_synthetic)
+        self.web.expose_api("GET", "/api/ai/result/{result_id}", self.ai_result)
 
     def telemetry(self, payload):
         """Callback Bridge corto; mantiene soltanto l'ultima anteprima."""
@@ -118,9 +123,11 @@ class Dashboard:
                 phase = "SENSOR_ERROR"
                 error = "Modulino Movement senza dati recenti."
         inspection = self.inspection.status()
+        ai = self.vibration_ai.status()
         return {"session_id": self.session_id, "phase": phase, "error": error,
                 "telemetry_age_s": age, "live": data, "last_event": last_event,
-                "ai_enabled": inspection["ai_enabled"], "inspection": inspection,
+                "ai_enabled": ai["ready"], "inspection": inspection,
+                "ai": ai,
                 "power_history": self.power_history.status(),
                 "telegram": self.notifications.status(),
                 "economics": self.electrical_demo.status()}
@@ -142,6 +149,9 @@ class Dashboard:
                 "error": data["error"], "last_event": data["last_event"],
                 "telemetry_age_s": age, "impacts": live["events"] if fresh else None,
                 "inspection": inspection,
+                "ai": {"model": data["ai"]["model"], "ready": data["ai"]["ready"],
+                       "latest_real": data["ai"]["latest_real"],
+                       "latest_synthetic": data["ai"]["latest_synthetic"]},
                 "power": {"valid": power_valid, "age_s": power_age,
                           "voltage_v": live["v_in"] if power_valid else None,
                           "current_ma": live["current_ma"] if power_valid else None,
@@ -176,9 +186,9 @@ class Dashboard:
                                              "Cache-Control": "no-store"})
 
     @staticmethod
-    def _economic_call(action, *args):
+    def _economic_call(action, *args, **kwargs):
         try:
-            return action(*args)
+            return action(*args, **kwargs)
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         except RuntimeError as error:
@@ -188,6 +198,24 @@ class Dashboard:
 
     def economic_reference(self):
         return self._economic_call(self.electrical_demo.start_reference)
+
+    def ai_settings(self, settings: dict):
+        return self._economic_call(self.vibration_ai.update_settings, settings)
+
+    def ai_analyze(self, request: dict):
+        return self._economic_call(self.vibration_ai.submit, self._path(request.get("event", ""), "csv"))
+
+    def ai_synthetic(self, request: dict):
+        return self._economic_call(self.vibration_ai.submit, self._path(request.get("event", ""), "csv"),
+                                   synthetic=True)
+
+    def ai_result(self, result_id: str):
+        try:
+            result = self.vibration_ai.result(result_id)
+            return JSONResponse(result, headers={"Cache-Control": "no-store",
+                "Content-Disposition": f'attachment; filename="ai_{result_id}.json"'})
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            raise self._history_error(error) from error
 
     def economic_start(self):
         return self._economic_call(self.electrical_demo.start_comparison)
@@ -240,7 +268,7 @@ class Dashboard:
                                           "Content-Length": str(size), "Cache-Control": "no-store"})
 
     def _path(self, name, extension):
-        if not EVENT_NAME.fullmatch(name) or extension not in ("csv", "json"):
+        if not isinstance(name, str) or not EVENT_NAME.fullmatch(name) or extension not in ("csv", "json"):
             raise HTTPException(status_code=400, detail="Nome evento non valido")
         root = self.output_dir.resolve()
         path = root / f"{name}.{extension}"

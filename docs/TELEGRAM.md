@@ -129,7 +129,9 @@ Prima della demo verifica:
 
 1. `/start` risponde con il Chat ID dopo l'avvio della nuova App.
 2. Senza destinatario salvato, il pulsante di invio rimane disabilitato.
-3. Una segnalazione normale arriva con unità, contatori e AI non attiva corretti.
+3. Una segnalazione normale arriva con unita, contatori e stato AI corretti.
+   Con l'[integrazione AI](AI_INTEGRAZIONE.md), gli score reali e sintetici
+   riportano evento e data; un'allerta `AI_TEST` e dichiarata come test artificiale.
 4. Con un'allerta elettrica, il messaggio include il motivo e i valori dell'allerta.
 5. Togliendo Internet alla scheda, il monitoraggio locale continua; lo storico
    segnala l'invio non confermato. Verifica la chat prima di ripetere.

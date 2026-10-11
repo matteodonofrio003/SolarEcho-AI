@@ -68,6 +68,7 @@ SSH/SCP possono chiedere la password nel terminale e, al primo accesso, la confe
 | `app/python/electrical_demo.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/electrical_demo.py` |
 | `app/python/inspection_alert.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/inspection_alert.py` |
 | `app/python/telegram_notifications.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/telegram_notifications.py` |
+| `app/python/vibration_ai.py` | `/home/arduino/ArduinoApps/solarecho-ai/python/vibration_ai.py` |
 | `app/assets/index.html` | `/home/arduino/ArduinoApps/solarecho-ai/assets/index.html` |
 | `app/assets/style.css` | `/home/arduino/ArduinoApps/solarecho-ai/assets/style.css` |
 | `app/assets/dashboard.js` | `/home/arduino/ArduinoApps/solarecho-ai/assets/dashboard.js` |
@@ -84,7 +85,10 @@ La sincronizzazione avviene quando si esegue il comando. Dopo una modifica in qu
 
 `sketch.yaml` riproduce le versioni delle librerie della App con cui il team ha gia acquisito i dati. La versione del core resta gestita dall'installazione App Lab dell'UNO Q.
 
-Il manifest abilita i brick `arduino:web_ui`, `arduino:telegram_bot` e la porta 7000. Dopo Run,
+Il manifest abilita i brick `arduino:web_ui`, `arduino:telegram_bot`,
+`arduino:vibration_anomaly_detection` e la porta 7000. Prima di Run, il modello
+personalizzato `ei-model-1136239-1` deve essere gia scaricato in App Lab.
+Vedere [avvio e soglia AI](AI_INTEGRAZIONE.md). Dopo Run,
 aprire `http://<IP-della-UNO-Q>:7000` sulla stessa rete: vedere
 [la procedura dashboard](DASHBOARD.md). Anche gli asset web richiedono deploy
 e riavvio per essere aggiornati sulla scheda.

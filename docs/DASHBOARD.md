@@ -1,5 +1,64 @@
 # Dashboard SolarEcho sulla UNO Q
 
+## Navigazione a tab
+
+La pagina e organizzata in quattro tab:
+
+| Tab | Contenuto |
+| --- | --- |
+| Panoramica | Tensione, corrente, potenza, impatti, ultimo risultato AI, LED e ultima acquisizione |
+| Vibrazioni e AI | Selezione evento, forma d'onda XYZ, inferenza, confronto sintetico, diagnostica e archivi |
+| Energia e costi | Riferimento, confronto con oscuramento, scenario economico e storico elettrico |
+| Segnalazioni | Dettaglio e reset dell'allerta, anteprima Telegram, invio e storico |
+
+La barra con connessione, READY/BUSY, eta della telemetria e allerta resta
+visibile durante lo scorrimento. Un'allerta aggiunge un indicatore al tab
+Segnalazioni; il pulsante **Apri segnalazione** porta al dettaglio.
+
+Impostazioni AI, soglie elettriche del LED, destinatario Telegram e parametri
+economici sono in pannelli richiudibili. Aprili per modificare e salvare i
+valori. Se manca la soglia AI o la configurazione Telegram, il relativo pannello
+si apre inizialmente per facilitare il setup. Reset allerta e invio Telegram
+restano accessibili fuori dalle impostazioni.
+
+La Panoramica mostra il risultato AI dell'ultima analisi conclusa, con origine,
+evento e data. **TEST SINTETICO** resta dichiarato anche qui e nell'allerta:
+non indica una modifica fisica misurata. I risultati archiviati non sono uno
+stato aggiornato in tempo reale del pannello. In assenza di connessione i valori
+live vengono rimossi e gli altri sono indicati come ultimi dati ricevuti.
+
+Cambiare tab non interrompe acquisizione, inferenza, salvataggio o richieste
+gia in corso. Le selezioni degli eventi e i valori scritti nei moduli restano
+in memoria fino alla ricarica della pagina. I grafici si ridisegnano quando
+diventano visibili. Il tab selezionato e indicato nell'URL, ad esempio
+`#vibrazioni`, e viene ripristinato ricaricando quell'indirizzo.
+
+Su telefono la barra dei tab scorre orizzontalmente. Da tastiera usa Tab per
+raggiungere la navigazione, frecce sinistra/destra per cambiare tab e Home/End
+per il primo/ultimo. Si possono usare anche i collegamenti della Panoramica.
+
+### Aggiornamento e verifica della nuova interfaccia
+
+1. Dal repository esegui `.\deploy.ps1` senza `-Start`.
+2. Riapri SolarEcho-AI in App Lab, riconfigura il token del brick Telegram
+   dopo il deploy e verifica il modello personalizzato selezionato.
+3. Premi Run, poi ricarica la dashboard con **Ctrl+F5**.
+4. Controlla i quattro tab e apri i pannelli delle impostazioni. I valori
+   devono essere quelli salvati sulla scheda.
+5. Effettua un impatto aspettando READY. Cambia tab mentre viene salvato:
+   contatore, evento e risultato AI devono aggiornarsi anche in Panoramica.
+6. Apri Vibrazioni e AI e verifica i grafici; seleziona un evento, cambia tab
+   e torna: selezione e dati devono restare disponibili.
+7. Esegui un test sintetico e verifica la dicitura nella Panoramica e, se
+   scatta l'allerta, nella barra sempre visibile. Leggi il dettaglio in
+   Segnalazioni e usa il reset.
+8. Verifica Energia e costi, download e anteprima Telegram; l'invio resta
+   manuale. Prova anche dal telefono e con le frecce della tastiera.
+
+Questa modifica riguarda gli asset HTML/CSS/JavaScript. Non aggiunge dipendenze
+frontend. L'assistente ha effettuato una revisione statica senza eseguire app,
+test o deploy; la verifica della nuova interfaccia e affidata al team.
+
 ## Cosa mostra
 
 - Tensione del pannello su VIN+ dell'INA219, corrente in mA e potenza in **mW**.
@@ -12,7 +71,9 @@
 - Forma d'onda di ciascun evento salvato, con i timestamp reali.
 - Ultimi 100 eventi presenti sulla scheda, download CSV originale e JSON.
 
-Il modello AI e **non attivo**. La pagina non assegna NORMAL/ANOMALY al pannello.
+Il modello AI personalizzato analizza gli eventi: vedere
+[avvio, soglia e test sintetico](AI_INTEGRAZIONE.md). Gli esiti NORMAL/ANOMALY
+descrivono la singola finestra rispetto alla baseline, non un danno certo.
 "Cattura completa" descrive la qualita dell'acquisizione, non lo stato meccanico
 del pannello e non la sua idoneita automatica per il training.
 
@@ -34,7 +95,7 @@ Questa estensione deve essere provata dal team.
    ```
 
    Lo script ora trasferisce anche `python/dashboard.py`, `python/power_history.py`,
-   `python/electrical_demo.py` e `assets/`.
+   `python/electrical_demo.py`, `python/vibration_ai.py` e `assets/`.
    I CSV gia presenti sulla scheda vengono conservati.
 
 5. Torna alla lista delle App e riapri **SolarEcho-AI** in App Lab.
@@ -45,12 +106,16 @@ Questa estensione deve essere provata dal team.
      - 7000
    bricks:
      - arduino:web_ui
+     - arduino:telegram_bot
+     - arduino:vibration_anomaly_detection:
+         model: ei-model-1136239-1
    ```
 
    Non serve aggiungere nuovamente il brick a mano. Se nell'editor vedi ancora
    `bricks: []`, ricarica la App e verifica che il deploy sia terminato.
 
-6. Premi **Run**. Attendi la compilazione e l'avvio di Python. Al primo avvio
+6. Reinserisci il token Telegram nel brick dopo il deploy e verifica che il
+   modello AI sia gia scaricato. Premi **Run**. Attendi la compilazione e l'avvio di Python. Al primo avvio
    il runtime potrebbe dover scaricare le dipendenze del brick: prepara questa
    fase con Internet disponibile prima della demo offline.
 7. Cerca nei log Python l'indirizzo mostrato dal brick Web UI come **Network URL**.
@@ -137,7 +202,7 @@ anche senza Internet. L'accesso pubblico da fuori rete resta da configurare.
 
 | Endpoint GET | Contenuto |
 | --- | --- |
-| `/api/status` | Stato, sessione, eta della telemetria, ultima anteprima, AI disattivata |
+| `/api/status` | Stato, sessione, eta della telemetria, anteprima, AI, allerta e servizi |
 | `/api/events` | Ultimi 100 eventi con CSV e JSON, qualita e totale archivio |
 | `/api/events/<nome>` | Timestamp in ms, accelerazione dei tre assi e metadati |
 | `/api/download/<nome>/csv` | CSV grezzo originale |
@@ -186,7 +251,7 @@ elettriche dei test precedenti alla sua installazione.
 ### Uso dalla pagina
 
 1. Esegui il nuovo deploy e Run, poi ricarica la dashboard.
-2. Nella sezione **Storico elettrico**, controlla che il numero di letture salvate
+2. Nel tab **Energia e costi**, sezione **Storico elettrico**, controlla che il numero di letture salvate
    della sessione corrente aumenti. La registrazione e automatica.
 3. Seleziona **Potenza**, **Tensione** o **Corrente** per cambiare il grafico.
 4. Lascia **Segui sessione corrente** selezionato per vedere la sessione attuale.

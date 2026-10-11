@@ -14,6 +14,85 @@ let demoActionPending = false, demoActionError = "", lastEconomics = null;
 let inspectionSettingsLoaded = false, inspectionPending = false, inspectionError = "";
 let telegramLoaded = false, telegramPending = false, telegramDirty = false;
 let telegramError = "", telegramRequestId = "", lastTelegram = null;
+let lastAI = null, aiSettingsLoaded = false, aiPending = false, aiDirty = false, aiError = "";
+let aiResult = null, aiResultVersion = 0, lastAICompletedId = "";
+let lastStatus = null, dashboardConnected = false;
+
+// Cambia soltanto la vista: polling, selezioni e dati restano attivi.
+function activateTab(name, {focus = false, scroll = true, replaceHash = true} = {}) {
+  const tabs = [...document.querySelectorAll(".tab-button[data-tab]")];
+  const selected = tabs.find((button) => button.dataset.tab === name) || tabs[0];
+  for (const button of tabs) {
+    const active = button === selected;
+    button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+    el(button.getAttribute("aria-controls")).hidden = !active;
+  }
+  if (replaceHash) history.replaceState(null, "", `#${selected.dataset.tab}`);
+  if (focus) selected.focus({preventScroll: true});
+  const listBounds = selected.parentElement.getBoundingClientRect();
+  const buttonBounds = selected.getBoundingClientRect();
+  if (buttonBounds.right > listBounds.right) selected.parentElement.scrollLeft += buttonBounds.right - listBounds.right;
+  else if (buttonBounds.left < listBounds.left) selected.parentElement.scrollLeft += buttonBounds.left - listBounds.left;
+  requestAnimationFrame(() => {
+    if (selected.getAttribute("aria-selected") !== "true") return;
+    if (scroll) {
+      const panel = el(selected.getAttribute("aria-controls"));
+      const top = panel.getBoundingClientRect().top + window.scrollY
+        - document.querySelector(".dashboard-navigation").offsetHeight - 12;
+      window.scrollTo({top: Math.max(0, top), behavior: "auto"});
+    }
+    drawWaveform(); drawPower(); drawAIChart();
+  });
+}
+
+function initializeTabs() {
+  const tabs = [...document.querySelectorAll(".tab-button[data-tab]")];
+  tabs.forEach((button, index) => {
+    button.onclick = () => activateTab(button.dataset.tab);
+    button.onkeydown = (event) => {
+      let target;
+      if (event.key === "ArrowRight") target = (index + 1) % tabs.length;
+      else if (event.key === "ArrowLeft") target = (index + tabs.length - 1) % tabs.length;
+      else if (event.key === "Home") target = 0;
+      else if (event.key === "End") target = tabs.length - 1;
+      else return;
+      event.preventDefault();
+      activateTab(tabs[target].dataset.tab, {focus: true});
+    };
+  });
+  document.querySelectorAll("[data-open-tab]").forEach((button) => {
+    button.onclick = () => activateTab(button.dataset.openTab, {focus: true});
+  });
+  window.addEventListener("hashchange", () => activateTab(location.hash.slice(1), {replaceHash: false}));
+  activateTab(location.hash.slice(1), {scroll: false});
+}
+
+function showOverview(data) {
+  const job = data.ai?.history.find((item) => item.state !== "QUEUED");
+  el("overview-ai-decision").textContent = !job ? "In attesa"
+    : job.state === "DONE" ? aiDecisions[job.decision] || job.state : job.state;
+  el("overview-ai-score").textContent = job?.state === "DONE" ? fmt(job.score, 4) : "—";
+  el("overview-ai-origin").hidden = !job;
+  el("overview-ai-origin").textContent = job?.synthetic ? "TEST SINTETICO" : "REALE";
+  el("overview-ai-origin").className = `badge ${job?.synthetic ? "busy" : "ready"}`;
+  el("overview-ai-event").textContent = job ? `${job.source_event} · ${new Date(job.at_utc).toLocaleString("it-IT")}` : "";
+  el("overview-ai-detail").textContent = job?.error ? `Analisi non completata: ${job.error}`
+    : job?.synthetic ? `Firma alterata artificialmente. Soglia usata: ${fmt(job.threshold, 4)}. Nessuna alterazione fisica misurata.`
+      : job ? `Esito della cattura reale. Soglia usata: ${fmt(job.threshold, 4)}. Non è una diagnosi di danno.`
+        : data.ai?.active_id || data.ai?.queued > 0 ? "Prima analisi in corso o in coda."
+          : "Effettua un impatto quando il sistema indica READY.";
+  const event = events.find((item) => item.name === data.last_event);
+  el("overview-last-event").textContent = data.last_event || "Nessun evento salvato in questa sessione.";
+  el("overview-event-quality").textContent = !data.last_event ? "In attesa"
+    : !event ? "Salvata" : event.complete ? "Completa" : "Da escludere";
+  el("overview-event-detail").textContent = event
+    ? `${fmt(event.samples, 0)} campioni · ${fmt(event.rate_hz, 1)} Hz${event.complete ? "" : ` · ${(event.reasons || []).join("; ")}`}`
+    : data.last_event ? "Metadati in aggiornamento; apri Vibrazioni e AI per il dettaglio."
+      : "I dati degli impatti vengono salvati sulla UNO Q.";
+  el("overview-open-event").disabled = !dashboardConnected || !data.last_event;
+  if (!dashboardConnected) el("overview-ai-detail").textContent = "UNO Q non raggiungibile: viene mostrato l’ultimo risultato ricevuto.";
+}
 
 async function getJSON(path, options = {}) {
   const controller = new AbortController();
@@ -29,6 +108,7 @@ async function getJSON(path, options = {}) {
 }
 
 function showStatus(data) {
+  lastStatus = data;
   const phases = {
     STARTING: ["AVVIO", "In attesa del firmware.", "busy"],
     READY: ["READY", "Pronto: puoi far cadere la pallina.", "ready"],
@@ -75,9 +155,140 @@ function showStatus(data) {
     showPowerError();
   }
   if (data.economics) showEconomics(data.economics);
-  el("ai-chip").textContent = data.ai_enabled ? "Inferenza AI attiva" : "AI non attiva";
+  el("ai-chip").textContent = data.ai_enabled ? "AI sperimentale attiva" : "AI non pronta";
+  if (data.ai) showAI(data.ai);
   if (data.inspection) showInspection(data.inspection, live, fresh);
   if (data.telegram) showTelegram(data.telegram);
+  showOverview(data);
+}
+
+function updateAIButtons() {
+  const busy = !dashboardConnected || aiPending || !lastAI?.ready || lastAI.active_id || lastAI.queued > 0;
+  const valid = Boolean(selectedName && waveform?.metadata.capture_complete === true);
+  el("ai-analyze").disabled = Boolean(busy || !valid || aiDirty);
+  el("ai-synthetic").disabled = Boolean(busy || !valid || aiDirty);
+  el("ai-save").disabled = !dashboardConnected || aiPending;
+}
+
+const aiDecisions = {NORMAL: "NORMAL", ANOMALY: "ANOMALY", UNCALIBRATED: "SOGLIA DA IMPOSTARE"};
+function showAI(data) {
+  lastAI = data;
+  if (!aiSettingsLoaded) {
+    el("ai-threshold").value = data.settings.threshold ?? "";
+    el("ai-alerts").checked = data.settings.alerts_enabled;
+    el("ai-form-settings").open = data.settings.threshold == null;
+    aiSettingsLoaded = true;
+  }
+  el("ai-connection").textContent = data.ready ? "MODELLO PRONTO" : data.connection;
+  el("ai-connection").className = `badge ${data.ready ? "ready" : "busy"}`;
+  const model = data.model;
+  el("ai-model").textContent = `${model.id}${model.frequency_hz ? ` · ${model.frequency_hz} Hz · ${model.input_features_count} valori XYZ · ${model.units}` : ""}`;
+  el("ai-real-score").textContent = fmt(data.latest_real?.score, 4);
+  el("ai-real-score").title = data.latest_real ? `${data.latest_real.source_event} · ${data.latest_real.at_utc}` : "";
+  el("ai-synthetic-score").textContent = fmt(data.latest_synthetic?.score, 4);
+  el("ai-synthetic-score").title = data.latest_synthetic ? `${data.latest_synthetic.source_event} · ${data.latest_synthetic.at_utc}` : "";
+  el("ai-status").textContent = aiDirty ? "Parametri modificati: salva prima della prova. Le catture automatiche usano ancora i valori salvati."
+    : data.active_id ? `Inferenza in corso · ${data.queued} richieste in coda. Il monitoraggio continua.`
+      : data.queued ? `${data.queued} richieste in attesa del modello.`
+        : data.settings.threshold == null ? "Score disponibili senza classificazione: inserisci e salva la soglia di Edge Impulse. Il LED AI resta disabilitato."
+          : `Soglia salvata: ${fmt(data.settings.threshold, 4)} · LED AI ${data.settings.alerts_enabled ? "abilitato" : "disabilitato"}. Nuove catture analizzate automaticamente.`;
+  const errors = [aiError, data.error, data.io_error].filter(Boolean).join(" ");
+  el("ai-error").textContent = errors; el("ai-error").hidden = !errors;
+  const body = el("ai-history"); body.replaceChildren();
+  for (const job of data.history) {
+    const row = document.createElement("tr");
+    const values = [ `${job.source_event} · ${job.synthetic ? "TEST SINTETICO" : "REALE"}`,
+      data.active_id === job.id ? "IN CORSO" : job.state === "DONE" ? aiDecisions[job.decision] || job.state : job.state,
+      `${fmt(job.score, 4)} / ${fmt(job.threshold, 4)}` ];
+    for (const value of values) {
+      const cell = document.createElement("td"); cell.textContent = value; row.append(cell);
+    }
+    row.firstChild.title = new Date(job.at_utc).toLocaleString("it-IT");
+    if (job.error) {
+      const note = document.createElement("p"); note.className = "caption";
+      note.textContent = job.error; row.children[1].append(note);
+    }
+    const cell = document.createElement("td"), button = document.createElement("button");
+    button.type = "button"; button.className = "event-link"; button.textContent = "Mostra risultato";
+    button.disabled = job.state === "QUEUED";
+    button.onclick = () => loadAIResult(job.id); cell.append(button); row.append(cell); body.append(row);
+  }
+  if (!data.history.length) {
+    const row = document.createElement("tr"), cell = document.createElement("td");
+    cell.colSpan = 4; cell.textContent = "Nessuna inferenza salvata."; row.append(cell); body.append(row);
+  }
+  updateAIButtons();
+  const completed = data.history.find((job) => job.state !== "QUEUED");
+  if (completed && completed.id !== lastAICompletedId) {
+    lastAICompletedId = completed.id;
+    loadAIResult(completed.id);
+  }
+}
+
+async function loadAIResult(id) {
+  const version = ++aiResultVersion;
+  try {
+    const result = await getJSON(`/api/ai/result/${encodeURIComponent(id)}`);
+    if (version !== aiResultVersion) return;
+    aiResult = result;
+    el("ai-origin").hidden = result.synthetic !== true;
+    el("ai-decision").textContent = result.state === "DONE" ? aiDecisions[result.decision] || result.state : result.state;
+    el("ai-latency").textContent = result.state === "DONE" ? fmt(result.inference_ms, 1) : "—";
+    el("ai-report").href = `/api/ai/result/${encodeURIComponent(id)}`;
+    el("ai-report").hidden = false;
+    const comparison = result.synthetic && result.state === "DONE"
+      ? ` · Stesso originale: ${fmt(result.original_score, 4)} → sintetico: ${fmt(result.score, 4)}` : ` · Score: ${fmt(result.score, 4)}`;
+    el("ai-plot-info").textContent = `${result.source_event} · ${new Date(result.at_utc).toLocaleString("it-IT")} · ${result.synthetic ? "TEST SINTETICO" : "REALE"}${comparison} · Soglia usata: ${fmt(result.threshold, 4)}. Modulo dinamico in g; originale verde, sintetico arancione tratteggiato. Offset tolto soltanto nel grafico.${result.error ? ` Errore: ${result.error}` : ""}`;
+    drawAIChart();
+  } catch (error) {
+    if (version !== aiResultVersion) return;
+    aiError = `Report AI non disponibile: ${error.message}`;
+    el("ai-error").textContent = aiError; el("ai-error").hidden = false;
+  }
+}
+
+function drawAIChart() {
+  if (!el("ai-chart").clientWidth) return;
+  if (!aiResult?.samples || aiResult.state !== "DONE") {
+    chartBase("ai-chart", "Seleziona un risultato AI completo."); return;
+  }
+  const series = aiResult.synthetic ? [aiResult.original_samples, aiResult.samples] : [aiResult.samples];
+  const magnitude = series.map((samples) => {
+    const pre = samples.filter((row) => row[0] < 0);
+    const offset = [1, 2, 3].map((axis) => pre.reduce((sum, row) => sum + row[axis], 0) / pre.length);
+    return samples.map((row) => [row[0], Math.hypot(...offset.map((v, k) => row[k+1] - v))]);
+  });
+  const max = Math.max(.005, ...magnitude.flat().map((point) => point[1])) * 1.1;
+  const chart = chartBase("ai-chart");
+  const {px, py} = grid(chart, -150, 1850, 0, max, (v) => fmt(v, 0), (v) => fmt(v, 3));
+  magnitude.forEach((points, index) => {
+    chart.ctx.strokeStyle = index === 0 ? colors[0] : colors[1];
+    chart.ctx.lineWidth = 1.5; chart.ctx.setLineDash(index === 0 ? [] : [5, 3]);
+    chart.ctx.beginPath(); points.forEach(([x, y], i) => {
+      if (i) chart.ctx.lineTo(px(x), py(y)); else chart.ctx.moveTo(px(x), py(y));
+    }); chart.ctx.stroke();
+  });
+  chart.ctx.setLineDash([]);
+}
+
+async function aiAction(endpoint, body) {
+  if (aiPending) return;
+  aiPending = true; aiError = ""; updateAIButtons();
+  try {
+    const result = await getJSON(`/api/ai/${endpoint}`, {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+    });
+    if (endpoint === "settings") {
+      aiDirty = false; aiSettingsLoaded = false; showAI(result);
+    } else if (lastAI) {
+      lastAI.queued += 1; showAI(lastAI);
+    }
+  } catch (error) {
+    aiError = `${error.message}. Controlla lo storico prima di ripetere la richiesta.`;
+  } finally {
+    aiPending = false;
+    if (lastAI) showAI(lastAI);
+  }
 }
 
 function showTelegram(data) {
@@ -85,6 +296,7 @@ function showTelegram(data) {
   if (!telegramLoaded) {
     el("telegram-panel-id").value = data.settings.panel_id;
     el("telegram-chat-id").value = data.settings.chat_id || "";
+    el("telegram-form-settings").open = !data.settings.chat_id || !data.token_present;
     telegramLoaded = true;
   }
   const labels = {STARTING: "AVVIO", CONNECTING: "CONNESSIONE IN CORSO", READY: "PRONTO PER INVIO", ERROR: "NON DISPONIBILE", DISABLED: "TOKEN DA CONFIGURARE"};
@@ -183,12 +395,15 @@ function showInspection(data, live, fresh) {
     inspectionSettingsLoaded = true;
   }
   el("inspection-panel").classList.toggle("alerting", data.active);
-  el("inspection-title").textContent = data.active ? "Ispezione consigliata" : "Segnalazione di ispezione";
+  el("inspection-title").textContent = data.alert?.reason === "AI_TEST" ? "TEST SINTETICO — LED demo"
+    : data.active ? "Ispezione consigliata" : "Segnalazione di ispezione";
   const alert = data.alert, evidence = alert?.evidence;
   el("inspection-reason").textContent = alert?.reason === "ELECTRICAL_DECLINE"
     ? `Calo di potenza rilevato: ${fmt(evidence.drop_pct, 1)}% dopo ${evidence.impacts_since_reference} impatti, per ${evidence.consecutive_samples} letture consecutive. Possibile alterazione: verificare luce, carico e pannello.`
+    : alert?.reason === "AI_TEST"
+      ? `Firma alterata artificialmente: score ${fmt(evidence.score, 4)}, soglia ${fmt(evidence.threshold, 4)}. Il LED dimostra il percorso software; non indica un'alterazione fisica misurata.`
     : alert?.reason === "AI_ANOMALY"
-      ? `Anomalia vibrazionale: score ${fmt(evidence.score, 4)} oltre la soglia ${fmt(evidence.threshold, 4)}. Ispezione consigliata.`
+      ? `Anomalia vibrazionale sperimentale: score ${fmt(evidence.score, 4)}, soglia ${fmt(evidence.threshold, 4)}. Possibile alterazione meccanica: ispezione consigliata, nessun danno certo.`
       : data.reference_available ? "Monitoraggio attivo rispetto al riferimento elettrico."
         : "Acquisisci un nuovo riferimento elettrico con il pannello illuminato, prima degli impatti.";
   el("inspection-progress").textContent = `Impatti dal riferimento: ${fmt(data.impacts_since_reference, 0)} / ${settings.min_impacts} · Letture consecutive con calo ≥ ${fmt(settings.drop_pct, 1)}%: ${data.consecutive_low_samples} / ${settings.consecutive_samples}`;
@@ -198,6 +413,23 @@ function showInspection(data, live, fresh) {
     : Boolean(live.led_on) !== data.active ? "LED: aggiornamento in corso"
       : live.led_on ? "LED ROSSO ACCESO" : "LED spento";
   el("inspection-led").className = `badge ${hardware && live.led_on ? "bad" : "busy"}`;
+  el("overview-led-state").textContent = el("inspection-led").textContent;
+  el("overview-inspection-detail").textContent = data.active ? el("inspection-reason").textContent
+    : "Nessuna allerta attiva. Le segnalazioni restano memorizzate fino al reset.";
+  el("overview-inspection").classList.toggle("alerting", data.active);
+  el("global-alert").hidden = !data.active;
+  el("tab-alert-indicator").hidden = !data.active;
+  const synthetic = alert?.reason === "AI_TEST";
+  el("global-alert").classList.toggle("synthetic", synthetic);
+  el("global-alert-origin").hidden = !synthetic;
+  el("global-alert-title").textContent = synthetic ? "Allerta demo da firma artificiale" : "Ispezione consigliata";
+  el("global-alert-detail").textContent = synthetic
+    ? `Score ${fmt(evidence.score, 4)} · soglia ${fmt(evidence.threshold, 4)}. Segnalazione da test artificiale.`
+    : alert?.reason === "AI_ANOMALY"
+      ? `Score ${fmt(evidence.score, 4)} · soglia ${fmt(evidence.threshold, 4)}. Possibile alterazione meccanica.`
+      : alert?.reason === "ELECTRICAL_DECLINE"
+        ? `Calo elettrico ${fmt(evidence.drop_pct, 1)}% dopo ${evidence.impacts_since_reference} impatti. Verificare luce, carico e pannello.`
+        : "Consulta il dettaglio della segnalazione.";
   el("inspection-reset").disabled = inspectionPending || !data.active;
   el("inspection-save").disabled = inspectionPending;
   const message = [inspectionError, data.io_error].filter(Boolean).join(" ");
@@ -322,6 +554,7 @@ function grid(chart, xmin, xmax, ymin, ymax, xLabel, yLabel) {
 }
 
 function drawPower() {
+  if (!el("power-chart").clientWidth) return;
   if (powerHistory.length < 2) { chartBase("power-chart", "In attesa di almeno due letture elettriche"); return; }
   const c = chartBase("power-chart");
   const axis = Number(el("power-quantity").value);
@@ -408,6 +641,7 @@ async function refreshPowerHistory() {
 }
 
 function drawWaveform() {
+  if (!el("wave-chart").clientWidth) return;
   if (!waveform || !waveform.samples.length) { chartBase("wave-chart", "Nessuna forma d’onda selezionata"); return; }
   const samples = waveform.samples;
   const before = samples.filter((p) => p[0] < 0);
@@ -443,6 +677,7 @@ async function selectEvent(name) {
   selectedName = name;
   el("event-select").value = name;
   waveform = null; drawWaveform();
+  updateAIButtons();
   el("csv-download").hidden = true; el("json-download").hidden = true;
   el("event-reasons").hidden = true;
   el("event-info").textContent = "Caricamento della forma d’onda…";
@@ -465,7 +700,7 @@ async function selectEvent(name) {
       selectedName = ""; // Ritenta al prossimo aggiornamento se si segue l'ultimo evento.
       el("event-info").textContent = `Evento non leggibile (${error.message}).`;
     }
-  }
+  } finally { updateAIButtons(); }
 }
 
 async function refreshEvents() {
@@ -503,11 +738,13 @@ async function refreshEvents() {
     await selectEvent(events[0].name);
   }
   lastEventsAt = Date.now();
+  if (lastStatus) showOverview(lastStatus);
 }
 
 async function poll() {
   try {
     const data = await getJSON("/api/status");
+    dashboardConnected = true;
     el("connection").textContent = "UNO Q connessa";
     el("connection-dot").className = "dot online";
     showStatus(data);
@@ -516,6 +753,7 @@ async function poll() {
       catch (error) { el("event-count").textContent = `Archivio non disponibile (${error.message})`; }
     }
   } catch (error) {
+    dashboardConnected = false;
     el("connection").textContent = "UNO Q non raggiungibile";
     el("connection-dot").className = "dot offline";
     el("phase").textContent = "OFFLINE"; el("phase").className = "badge bad";
@@ -526,9 +764,17 @@ async function poll() {
     el("power-detail").textContent = "Misura non disponibile";
     for (const id of ["reference-button", "comparison-start", "comparison-stop", "economic-save", "inspection-save", "inspection-reset"]) el(id).disabled = true;
     el("inspection-led").textContent = "LED: stato non aggiornato";
+    el("overview-led-state").textContent = "Stato non aggiornato";
+    el("overview-open-event").disabled = true;
+    el("overview-ai-detail").textContent = "UNO Q non raggiungibile: viene mostrato l’ultimo risultato ricevuto.";
+    el("overview-inspection-detail").textContent = "UNO Q non raggiungibile: l’eventuale allerta visualizzata è l’ultima ricevuta.";
+    el("ai-chip").textContent = "AI: stato non aggiornato";
+    if (!el("global-alert").hidden) el("global-alert-detail").textContent = "Ultima allerta ricevuta. Scheda non raggiungibile: consulta il dettaglio dopo la riconnessione.";
     el("telegram-connection").textContent = "STATO NON AGGIORNATO";
     for (const id of ["telegram-send", "telegram-save", "telegram-reconnect", "telegram-preview-button"]) el(id).disabled = true;
     document.querySelectorAll(".telegram-retry").forEach((button) => { button.disabled = true; });
+    el("ai-connection").textContent = "STATO NON AGGIORNATO";
+    for (const id of ["ai-save", "ai-analyze", "ai-synthetic"]) el(id).disabled = true;
     el("comparison-power").textContent = "—";
     el("live-reduction").textContent = "—";
     el("demo-status").textContent = "UNO Q non raggiungibile: gli altri valori sono gli ultimi ricevuti. Il confronto continua se la App resta attiva.";
@@ -541,6 +787,24 @@ el("event-select").onchange = (event) => {
 };
 el("follow").onchange = () => { if (el("follow").checked && events.length) selectEvent(events[0].name); };
 el("remove-offset").onchange = drawWaveform;
+el("overview-open-event").onclick = () => {
+  if (!dashboardConnected || !lastStatus?.last_event) return;
+  activateTab("vibrazioni", {focus: true});
+  el("follow").checked = false;
+  selectEvent(lastStatus.last_event);
+};
+el("ai-form").addEventListener("input", () => {
+  aiDirty = true; if (lastAI) showAI(lastAI);
+});
+el("ai-form").onsubmit = (event) => {
+  event.preventDefault();
+  if (!el("ai-threshold").value.trim()) return;
+  const threshold = Number(el("ai-threshold").value);
+  if (!Number.isFinite(threshold)) return;
+  aiAction("settings", {threshold, alerts_enabled: el("ai-alerts").checked});
+};
+el("ai-analyze").onclick = () => aiAction("analyze", {event: selectedName});
+el("ai-synthetic").onclick = () => aiAction("synthetic", {event: selectedName});
 el("telegram-form").addEventListener("input", () => {
   telegramDirty = true;
   if (lastTelegram) showTelegram(lastTelegram);
@@ -613,5 +877,6 @@ async function pollPowerHistory() {
   try { await refreshPowerHistory(); }
   finally { setTimeout(pollPowerHistory, 3000); }
 }
-window.addEventListener("resize", () => { drawWaveform(); drawPower(); });
-drawWaveform(); drawPower(); poll(); pollPowerHistory();
+initializeTabs();
+window.addEventListener("resize", () => { drawWaveform(); drawPower(); drawAIChart(); });
+drawWaveform(); drawPower(); drawAIChart(); poll(); pollPowerHistory();

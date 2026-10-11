@@ -31,7 +31,8 @@ def format_message(panel_id, snapshot, request_id="ANTEPRIMA"):
     alert = inspection.get("alert") or {}
     evidence = alert.get("evidence", {})
     reason = {"ELECTRICAL_DECLINE": "Calo elettrico persistente dopo impatti",
-              "AI_ANOMALY": "Anomalia vibrazionale AI"}.get(alert.get("reason"), "Segnalazione manuale")
+              "AI_ANOMALY": "Anomalia vibrazionale AI sperimentale",
+              "AI_TEST": "TEST SINTETICO - firma alterata artificialmente"}.get(alert.get("reason"), "Segnalazione manuale")
     power = snapshot.get("power", {})
     imu = snapshot.get("imu", {})
     lines = ["SolarEcho AI - Segnalazione pannello", f"ID: {request_id}",
@@ -56,14 +57,25 @@ def format_message(panel_id, snapshot, request_id="ANTEPRIMA"):
     economics = snapshot.get("economics", {})
     lines += [f"Potenza di riferimento: {number(economics.get('reference_mw'))} mW",
               f"Calo elettrico recente: {number(economics.get('live_reduction_pct'), 1)} %",
-              "AI: " + ("inferenza disponibile" if inspection.get("ai_enabled") else "non attiva")]
+              "AI: " + ("inferenza locale sperimentale disponibile" if snapshot.get("ai", {}).get("ready") else "non pronta")]
     if alert:
         lines.append(f"Allerta registrata: {alert.get('at_utc', 'n/d')}")
     if alert.get("reason") == "ELECTRICAL_DECLINE":
         lines.append(f"Calo alla segnalazione: {number(evidence.get('drop_pct'), 1)} %")
-    if alert.get("reason") == "AI_ANOMALY":
+    if alert.get("reason") in ("AI_ANOMALY", "AI_TEST"):
         lines.append(f"Score AI dell'allerta: {number(evidence.get('score'), 5)}; "
                      f"soglia: {number(evidence.get('threshold'), 5)}")
+        if evidence.get("synthetic") or alert.get("reason") == "AI_TEST":
+            lines.append("LED attivato da un TEST SINTETICO: non e una misura di alterazione fisica del pannello.")
+    ai = snapshot.get("ai", {})
+    for key, label in (("latest_real", "Ultima inferenza su acquisizione reale"),
+                       ("latest_synthetic", "Ultimo TEST SINTETICO")):
+        result = ai.get(key)
+        if result:
+            lines.append(f"{label}: score {number(result.get('score'), 5)}, "
+                         f"esito {result.get('decision', 'n/d')}, "
+                         f"evento {result.get('source_event', 'n/d')}, "
+                         f"data {result.get('at_utc', 'n/d')}")
     if snapshot.get("last_event"):
         lines.append(f"Ultima acquisizione: {snapshot['last_event']}")
     scenario = economics.get("scenario")

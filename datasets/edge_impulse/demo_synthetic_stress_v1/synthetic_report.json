@@ -1,0 +1,219 @@
+{
+  "format_version": 1,
+  "synthetic": true,
+  "split": "test",
+  "profile": "stress",
+  "purpose": "Perturbazioni software di segnali di test reali; non validazione di danni fisici",
+  "source_export_report": "C:\\Users\\acest\\Desktop\\SolarEcho-AI\\datasets\\edge_impulse\\demo_test_v1\\export_report.json",
+  "source_report_sha256": "236b39206af6feb8093bd813923e092c1501d1d7869a870affd409dc95645424",
+  "rate_hz": 100,
+  "window_duration_ms": 2000,
+  "samples_per_file": 200,
+  "trigger_at_export_ms": 150,
+  "units": "g",
+  "axes": [
+    "accX",
+    "accY",
+    "accZ"
+  ],
+  "source_events": 5,
+  "generated_files": 5,
+  "pretrigger_preserved": true,
+  "sources_unchanged": true,
+  "transform_scope": "Solo campioni dal trigger in poi; offset medio pretrigger conservato",
+  "warning": "Varianti dello stesso evento sono correlate. Non contarle come impatti fisici indipendenti. La label anomaly e un'aspettativa del test, non un risultato del modello.",
+  "sources": [
+    {
+      "source_csv": "C:\\Users\\acest\\Desktop\\SolarEcho-AI\\datasets\\edge_impulse\\demo_test_v1\\test\\normal.937b893ca7b5f68b7157a1762da21fce7f6f1dafc7ea1da4bd0f7fb0da34eac7.csv",
+      "source_csv_sha256": "48e64dca1f276a2e1df329603f2c1ceca744e1e1f000ada7bae0ade83fa2b5e5",
+      "raw_source_sha256": "937b893ca7b5f68b7157a1762da21fce7f6f1dafc7ea1da4bd0f7fb0da34eac7",
+      "session_id": "20261011_104546_726985dd",
+      "event_id": 24,
+      "pretrigger_mean_g": [
+        -0.070071957128,
+        -0.87468790554,
+        -0.5039426778466667
+      ],
+      "posttrigger_dynamic_rms_g": 0.042605148812698695,
+      "posttrigger_dynamic_peak_g": 0.18585579471217456,
+      "max_abs_axis_g": 0.9300322708
+    },
+    {
+      "source_csv": "C:\\Users\\acest\\Desktop\\SolarEcho-AI\\datasets\\edge_impulse\\demo_test_v1\\test\\normal.f2187f83cd90f67623027f4b2f397e91351c97644679d376a06b2dfb4d35e4f2.csv",
+      "source_csv_sha256": "10c9bb5cb58c5d26f904cf7e91e9cc50dcf52f2126e632fce8ff21c5ff159d5a",
+      "raw_source_sha256": "f2187f83cd90f67623027f4b2f397e91351c97644679d376a06b2dfb4d35e4f2",
+      "session_id": "20261011_104546_726985dd",
+      "event_id": 25,
+      "pretrigger_mean_g": [
+        -0.06936473751733334,
+        -0.8761226191133333,
+        -0.5012998562933333
+      ],
+      "posttrigger_dynamic_rms_g": 0.04737227006090446,
+      "posttrigger_dynamic_peak_g": 0.27609902256089414,
+      "max_abs_axis_g": 1.079176877
+    },
+    {
+      "source_csv": "C:\\Users\\acest\\Desktop\\SolarEcho-AI\\datasets\\edge_impulse\\demo_test_v1\\test\\normal.512f03b86fcd16a477989dcc5a3e4bbe9734a6ab8d8831fe4d131d733e15bb04.csv",
+      "source_csv_sha256": "4bba300daa217173151cc4534a3ca24bb123c7b8c5133740170f3e45cb190019",
+      "raw_source_sha256": "512f03b86fcd16a477989dcc5a3e4bbe9734a6ab8d8831fe4d131d733e15bb04",
+      "session_id": "20261011_104546_726985dd",
+      "event_id": 26,
+      "pretrigger_mean_g": [
+        -0.06968694927733333,
+        -0.8752371199266666,
+        -0.5027272201666667
+      ],
+      "posttrigger_dynamic_rms_g": 0.03731387014564565,
+      "posttrigger_dynamic_peak_g": 0.33583113242149676,
+      "max_abs_axis_g": 1.045008728
+    },
+    {
+      "source_csv": "C:\\Users\\acest\\Desktop\\SolarEcho-AI\\datasets\\edge_impulse\\demo_test_v1\\test\\normal.e1711df26ed94f1305c902ffcdb406e56abe7d8b31bee1c1eab9763486f4be11.csv",
+      "source_csv_sha256": "192454445b6c4616059b47444893229436efcae15538753ce8f5f2ed2e1b4696",
+      "raw_source_sha256": "e1711df26ed94f1305c902ffcdb406e56abe7d8b31bee1c1eab9763486f4be11",
+      "session_id": "20261011_104546_726985dd",
+      "event_id": 27,
+      "pretrigger_mean_g": [
+        -0.06965302032133333,
+        -0.8749031257733333,
+        -0.5034775723533333
+      ],
+      "posttrigger_dynamic_rms_g": 0.03301840288277756,
+      "posttrigger_dynamic_peak_g": 0.2886551984808056,
+      "max_abs_axis_g": 0.977359075
+    },
+    {
+      "source_csv": "C:\\Users\\acest\\Desktop\\SolarEcho-AI\\datasets\\edge_impulse\\demo_test_v1\\test\\normal.df24e30230a8e794c79f1afa5cabc0bccaf4724eb7acc09aa93107894d722b92.csv",
+      "source_csv_sha256": "c5b6c7245ed2d39c47a78d9b9adb7dcee0df5825339e8a4dc76fba32e2b472dc",
+      "raw_source_sha256": "df24e30230a8e794c79f1afa5cabc0bccaf4724eb7acc09aa93107894d722b92",
+      "session_id": "20261011_104546_726985dd",
+      "event_id": 28,
+      "pretrigger_mean_g": [
+        -0.070398469228,
+        -0.87460622792,
+        -0.5044815086133333
+      ],
+      "posttrigger_dynamic_rms_g": 0.03718407168936512,
+      "posttrigger_dynamic_peak_g": 0.23209218052421446,
+      "max_abs_axis_g": 0.9963764063
+    }
+  ],
+  "generated": [
+    {
+      "synthetic": true,
+      "expected_test_label": "anomaly",
+      "source_event_id": 24,
+      "source_session_id": "20261011_104546_726985dd",
+      "source_export_sha256": "48e64dca1f276a2e1df329603f2c1ceca744e1e1f000ada7bae0ade83fa2b5e5",
+      "transform": {
+        "name": "stress_sustained",
+        "kind": "sustained",
+        "amplitude_g": 0.35,
+        "frequencies_hz": [
+          8.0,
+          17.0,
+          29.0
+        ],
+        "ramp_time_s": 0.05
+      },
+      "output_csv": "test/anomaly.synthetic_stress_sustained.937b893ca7b5f68b7157a1762da21fce7f6f1dafc7ea1da4bd0f7fb0da34eac7.csv",
+      "posttrigger_dynamic_rms_g": 0.4272606734981493,
+      "posttrigger_dynamic_peak_g": 0.6156346141017626,
+      "max_abs_axis_g": 1.259585976849895,
+      "output_sha256": "48b0b014bd94cddb404b142568aa4b7e7d931ec86c5a83ea2bf5dd31c7e6fa32"
+    },
+    {
+      "synthetic": true,
+      "expected_test_label": "anomaly",
+      "source_event_id": 25,
+      "source_session_id": "20261011_104546_726985dd",
+      "source_export_sha256": "10c9bb5cb58c5d26f904cf7e91e9cc50dcf52f2126e632fce8ff21c5ff159d5a",
+      "transform": {
+        "name": "stress_sustained",
+        "kind": "sustained",
+        "amplitude_g": 0.35,
+        "frequencies_hz": [
+          8.0,
+          17.0,
+          29.0
+        ],
+        "ramp_time_s": 0.05
+      },
+      "output_csv": "test/anomaly.synthetic_stress_sustained.f2187f83cd90f67623027f4b2f397e91351c97644679d376a06b2dfb4d35e4f2.csv",
+      "posttrigger_dynamic_rms_g": 0.42661565100719956,
+      "posttrigger_dynamic_peak_g": 0.6514333993052431,
+      "max_abs_axis_g": 1.2924503068033038,
+      "output_sha256": "bc11ae5802e82e8b65f58cad7806622e585bf0cb2e5f3d950c48c6cc8debcee1"
+    },
+    {
+      "synthetic": true,
+      "expected_test_label": "anomaly",
+      "source_event_id": 26,
+      "source_session_id": "20261011_104546_726985dd",
+      "source_export_sha256": "4bba300daa217173151cc4534a3ca24bb123c7b8c5133740170f3e45cb190019",
+      "transform": {
+        "name": "stress_sustained",
+        "kind": "sustained",
+        "amplitude_g": 0.35,
+        "frequencies_hz": [
+          8.0,
+          17.0,
+          29.0
+        ],
+        "ramp_time_s": 0.05
+      },
+      "output_csv": "test/anomaly.synthetic_stress_sustained.512f03b86fcd16a477989dcc5a3e4bbe9734a6ab8d8831fe4d131d733e15bb04.csv",
+      "posttrigger_dynamic_rms_g": 0.4279257339667341,
+      "posttrigger_dynamic_peak_g": 0.639086457399506,
+      "max_abs_axis_g": 1.2983603026904855,
+      "output_sha256": "9dc30e99af51fadb75c5af9ce21df31c6ceb6b19e7dd5039bf464acf9a3b0699"
+    },
+    {
+      "synthetic": true,
+      "expected_test_label": "anomaly",
+      "source_event_id": 27,
+      "source_session_id": "20261011_104546_726985dd",
+      "source_export_sha256": "192454445b6c4616059b47444893229436efcae15538753ce8f5f2ed2e1b4696",
+      "transform": {
+        "name": "stress_sustained",
+        "kind": "sustained",
+        "amplitude_g": 0.35,
+        "frequencies_hz": [
+          8.0,
+          17.0,
+          29.0
+        ],
+        "ramp_time_s": 0.05
+      },
+      "output_csv": "test/anomaly.synthetic_stress_sustained.e1711df26ed94f1305c902ffcdb406e56abe7d8b31bee1c1eab9763486f4be11.csv",
+      "posttrigger_dynamic_rms_g": 0.42429383122692294,
+      "posttrigger_dynamic_peak_g": 0.5594874101025102,
+      "max_abs_axis_g": 1.251677996555041,
+      "output_sha256": "f1ae79779f4acb4acc8d6f3b51f3e5b272bd5b896dc4991c37b80caac6d49835"
+    },
+    {
+      "synthetic": true,
+      "expected_test_label": "anomaly",
+      "source_event_id": 28,
+      "source_session_id": "20261011_104546_726985dd",
+      "source_export_sha256": "c5b6c7245ed2d39c47a78d9b9adb7dcee0df5825339e8a4dc76fba32e2b472dc",
+      "transform": {
+        "name": "stress_sustained",
+        "kind": "sustained",
+        "amplitude_g": 0.35,
+        "frequencies_hz": [
+          8.0,
+          17.0,
+          29.0
+        ],
+        "ramp_time_s": 0.05
+      },
+      "output_csv": "test/anomaly.synthetic_stress_sustained.df24e30230a8e794c79f1afa5cabc0bccaf4724eb7acc09aa93107894d722b92.csv",
+      "posttrigger_dynamic_rms_g": 0.42543662013281414,
+      "posttrigger_dynamic_peak_g": 0.5956326937712424,
+      "max_abs_axis_g": 1.2310209386550413,
+      "output_sha256": "e53c9ed3fc0a0382aea7f079ec9a61af11c74e39af3fd2c936ca685bd90071c6"
+    }
+  ]
+}

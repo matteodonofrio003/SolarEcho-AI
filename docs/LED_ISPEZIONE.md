@@ -7,7 +7,7 @@ Il LED si accende quando si verifica **una delle due condizioni**:
 1. Dopo un riferimento elettrico valido, il contatore piezo registra almeno
    **3 nuovi impatti** e **5 nuove letture consecutive** dell'INA219 indicano
    una potenza inferiore di almeno **20%** rispetto al riferimento.
-2. Un futuro modello locale restituisce uno score oltre la sua soglia calibrata
+2. Il modello locale personalizzato restituisce uno score maggiore o uguale alla soglia salvata
    per una cattura confrontabile. Questa condizione non richiede 3 impatti.
 
 Numero di impatti, percentuale e letture consecutive sono modificabili nella
@@ -15,8 +15,10 @@ dashboard. **3 / 20% / 5 sono valori iniziali per la demo, non soglie validate**
 Il conteggio usa gli eventi accettati dal firmware, dopo isteresi e lockout:
 verificare che corrispondano ai colpi realmente effettuati.
 
-L'AI resta sospesa: la seconda condizione dispone del collegamento software,
-ma non viene generata alcuna inferenza finche non integriamo un modello reale.
+L'integrazione AI e pronta per la prova: [procedura e soglia](AI_INTEGRAZIONE.md).
+Senza soglia salvata, o con LED AI disabilitato, non vengono generate allerte AI.
+Il test artificiale puo accendere il LED, ma dashboard, archivio e Telegram
+riportano **AI_TEST / TEST SINTETICO**, non un'alterazione fisica misurata.
 
 L'allerta significa **"Ispezione consigliata"**. Ombra, variazioni della luce,
 carico o comportamento del charger possono cambiare la potenza. La sequenza
@@ -111,7 +113,7 @@ API aggiunte: `POST /api/inspection/settings` con i tre parametri
 `min_impacts`, `drop_pct`, `consecutive_samples`; `POST /api/inspection/reset`.
 Lo stato si trova nel campo `inspection` di `GET /api/status`.
 
-## Collegamento futuro al modello AI
+## Collegamento al modello AI
 
 Nel loop di elaborazione, dopo un'inferenza reale e la verifica di qualita:
 
@@ -124,7 +126,9 @@ inspection.on_ai_result(float(score), float(calibrated_threshold), event_name,
 la soglia di calo elettrico. Uno score non finito o una cattura non confrontabile
 non genera una richiesta di ispezione. Uno score normale non cancella un'allerta
 precedente. La chiamata va eseguita nel processamento Python, non nel callback
-di acquisizione. Non e esposta una API per simulare una classificazione AI.
+di acquisizione. Il worker `vibration_ai.py` esegue questa chiamata.
+`/api/ai/synthetic` genera una copia alterata e inferisce sul runner reale;
+non accetta una classificazione o uno score da inserire a mano.
 
 ## Verifiche affidate al team
 

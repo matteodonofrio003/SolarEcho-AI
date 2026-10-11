@@ -10,77 +10,119 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="brand-icon" aria-hidden="true">◉</span><div>SolarEcho <strong>AI</strong><small>MONITORAGGIO DEL PANNELLO</small></div></div>
-    <div class="connection"><span id="connection-dot" class="dot"></span><span id="connection">Connessione…</span></div>
   </header>
   <main>
     <section class="intro">
       <div><p class="eyebrow">BEYOND SOLAR / HACKTURIN 2026</p><h1>Ascoltiamo il pannello.</h1><p class="muted">Energia prodotta e risposta alle vibrazioni, direttamente dalla UNO Q.</p></div>
-      <span id="ai-chip" class="chip">AI non attiva</span>
+      <span id="ai-chip" class="chip">AI in avvio</span>
     </section>
 
-    <section class="status-strip" aria-live="polite">
-      <div><span id="phase" class="badge">AVVIO</span><span id="status-detail">In attesa dei sensori.</span></div>
-      <span id="telemetry-age" class="muted">Nessuna lettura</span>
-    </section>
-    <p id="error" class="error" hidden></p>
+    <div class="dashboard-navigation">
+      <section class="status-strip" aria-live="polite">
+        <div class="status-leading"><span id="phase" class="badge">AVVIO</span><span id="status-detail">In attesa dei sensori.</span></div>
+        <div class="status-connection"><div class="connection"><span id="connection-dot" class="dot"></span><span id="connection">Connessione…</span></div><span id="telemetry-age" class="muted">Nessuna lettura</span></div>
+      </section>
+      <p id="error" class="error" hidden></p>
+      <div id="global-alert" class="global-alert" role="status" hidden>
+        <div><strong id="global-alert-title">Ispezione consigliata</strong><span id="global-alert-origin" class="badge busy" hidden>TEST SINTETICO</span><p id="global-alert-detail">Consulta il dettaglio della segnalazione.</p></div>
+        <button type="button" class="button secondary" data-open-tab="segnalazioni">Apri segnalazione</button>
+      </div>
+      <nav class="tab-list" role="tablist" aria-label="Sezioni della dashboard">
+        <button id="tab-panoramica" type="button" class="tab-button" role="tab" aria-controls="panel-panoramica" aria-selected="true" data-tab="panoramica">Panoramica</button>
+        <button id="tab-vibrazioni" type="button" class="tab-button" role="tab" aria-controls="panel-vibrazioni" aria-selected="false" tabindex="-1" data-tab="vibrazioni">Vibrazioni e AI</button>
+        <button id="tab-energia" type="button" class="tab-button" role="tab" aria-controls="panel-energia" aria-selected="false" tabindex="-1" data-tab="energia">Energia e costi</button>
+        <button id="tab-segnalazioni" type="button" class="tab-button" role="tab" aria-controls="panel-segnalazioni" aria-selected="false" tabindex="-1" data-tab="segnalazioni">Segnalazioni <span id="tab-alert-indicator" class="tab-alert-indicator" hidden>Allerta</span></button>
+      </nav>
+    </div>
 
-    <section id="inspection-panel" class="card inspection-panel" aria-live="polite">
-      <div class="section-title"><h2 id="inspection-title">Segnalazione di ispezione</h2><span id="inspection-led" class="badge">LED in attesa</span></div>
-      <p id="inspection-reason" class="muted">Acquisisci il riferimento elettrico prima degli impatti.</p>
-      <p id="inspection-progress" class="caption">In attesa delle misure.</p>
-      <form id="inspection-form" class="economic-form">
-        <label>Impatti dopo il riferimento<input id="inspection-impacts" type="number" min="1" max="1000" step="1" required></label>
-        <label>Calo minimo di potenza (%)<input id="inspection-drop" type="number" min="1" max="100" step="any" required></label>
-        <label>Letture consecutive sotto soglia<input id="inspection-samples" type="number" min="2" max="120" step="1" required></label>
-        <div class="economic-save"><button id="inspection-save" class="button secondary" type="submit">Salva soglie LED</button><button id="inspection-reset" class="button" type="button" disabled>Conferma / reset allerta</button></div>
-      </form>
-      <p id="inspection-error" class="error" hidden></p>
-      <p class="caption">Soglie iniziali per la demo, da calibrare. Il calo può dipendere da ombra, luce o carico: non dimostra un danno causato dagli impatti. L’allerta resta attiva fino al reset; se la condizione persiste si riaccende. Il modello AI è attualmente sospeso.</p>
-    </section>
-
-    <section class="card telegram-panel">
-      <div class="section-title"><h2>Segnalazione via Telegram</h2><span id="telegram-connection" class="badge">In attesa</span></div>
-      <p class="muted">Invia i dati del pannello alla tua chat di test. Dal telefono, invia <strong>/start</strong> al bot per conoscere il Chat ID, poi salvalo qui.</p>
-      <form id="telegram-form" class="economic-form">
-        <label>Identificativo pannello<input id="telegram-panel-id" type="text" maxlength="64" required></label>
-        <label>Chat ID della chat privata<input id="telegram-chat-id" type="text" inputmode="numeric" pattern="[1-9][0-9]{0,15}" placeholder="Chat ID restituito dal bot" required></label>
-        <div class="economic-save"><button id="telegram-save" class="button secondary" type="submit">Salva destinatario</button><button id="telegram-reconnect" class="button secondary" type="button">Riconnetti</button></div>
-      </form>
-      <div class="demo-actions"><button id="telegram-preview-button" class="button secondary" type="button">Anteprima dati</button><button id="telegram-send" class="button" type="button" disabled>Invia segnalazione</button></div>
-      <pre id="telegram-preview" class="telegram-preview" hidden></pre>
-      <p id="telegram-status" class="caption" aria-live="polite">Configura il destinatario. Il token resta nel campo segreto del brick in App Lab.</p>
-      <p id="telegram-diagnostic" class="caption" aria-live="polite"></p>
-      <p id="telegram-error" class="error" hidden></p>
-      <div class="table-scroll"><table><thead><tr><th>Richiesta</th><th>Data</th><th>Esito</th><th>Azioni</th></tr></thead><tbody id="telegram-history"></tbody></table></div>
-      <p class="caption">Invio soltanto su richiesta. "Inviato" indica accettazione da Telegram, non lettura dell'operatore. Se l'esito non è confermato, controlla la chat prima di riprovare: potrebbero arrivare duplicati. I dati mancanti restano indicati come non disponibili.</p>
-    </section>
-
+    <div id="panel-panoramica" class="tab-panel" role="tabpanel" aria-labelledby="tab-panoramica" tabindex="0">
+      <div class="panel-heading"><h2>Il pannello, a colpo d’occhio.</h2><p class="muted">Produzione, impatti e segnalazioni della demo.</p></div>
     <section class="metrics" aria-label="Misure elettriche e impatti">
       <article class="card metric"><span class="label">TENSIONE PANNELLO</span><div class="value"><span id="voltage">—</span><small>V</small></div><p>VIN+ rispetto a GND</p></article>
       <article class="card metric"><span class="label">CORRENTE</span><div class="value"><span id="current">—</span><small>mA</small></div><p>Pannello → solar charger</p></article>
       <article class="card metric highlight"><span class="label">POTENZA PANNELLO</span><div class="value"><span id="power">—</span><small>mW</small></div><p id="power-detail">In attesa dell’INA219</p></article>
       <article class="card metric"><span class="label">IMPATTI RILEVATI</span><div class="value"><span id="impacts">—</span></div><p>Contatore della sessione firmware</p></article>
     </section>
+      <section class="summary-grid" aria-label="Riepilogo monitoraggio">
+        <article class="card summary-card">
+          <div class="section-title"><h2>Ultimo risultato AI</h2><span id="overview-ai-origin" class="badge" hidden></span></div>
+          <strong id="overview-ai-decision" class="summary-value">In attesa</strong>
+          <p class="summary-score">Score <strong id="overview-ai-score">—</strong></p>
+          <p id="overview-ai-detail" class="muted">Effettua un impatto quando il sistema indica READY.</p>
+          <p id="overview-ai-event" class="caption"></p>
+          <button type="button" class="button secondary" data-open-tab="vibrazioni">Apri Vibrazioni e AI</button>
+        </article>
+        <article id="overview-inspection" class="card summary-card">
+          <div class="section-title"><h2>Stato della segnalazione</h2></div>
+          <strong id="overview-led-state" class="summary-value">LED in attesa</strong>
+          <p id="overview-inspection-detail" class="muted">Nessuna informazione disponibile.</p>
+          <button type="button" class="button secondary" data-open-tab="segnalazioni">Apri Segnalazioni</button>
+        </article>
+        <article class="card summary-card">
+          <div class="section-title"><h2>Ultima acquisizione</h2></div>
+          <strong id="overview-event-quality" class="summary-value">In attesa</strong>
+          <p id="overview-last-event" class="event-name muted">Nessun evento salvato.</p>
+          <p id="overview-event-detail" class="caption">I dati degli impatti vengono salvati sulla UNO Q.</p>
+          <button id="overview-open-event" type="button" class="button secondary" disabled>Apri acquisizione</button>
+        </article>
+      </section>
+      <div class="demo-route"><strong>Durante la demo</strong><p>Attendi READY e fai cadere la pallina. Apri Vibrazioni e AI per la firma acquisita, Energia e costi per il confronto con oscuramento, Segnalazioni per richiedere un’ispezione.</p></div>
+    </div>
 
-    <section class="overview">
-      <article class="card">
-        <div class="section-title"><h2>Storico elettrico</h2><span class="muted">Salvataggio automatico sulla UNO Q</span></div>
-        <div class="history-controls"><label for="power-session">Sessione</label><select id="power-session"><option value="">In attesa della prima misura</option></select></div>
-        <div class="history-actions"><label class="option"><input type="checkbox" id="power-follow" checked> Segui sessione corrente</label><select id="power-quantity" aria-label="Grandezza elettrica"><option value="3">Potenza · mW</option><option value="1">Tensione · V</option><option value="2">Corrente · mA</option></select><a id="power-download" class="button" hidden>Scarica storico CSV</a></div>
-        <p id="power-log-status" class="caption" aria-live="polite">In attesa della registrazione.</p>
-        <p id="power-history-error" class="error" hidden></p>
-        <canvas id="power-chart" class="power-chart" role="img" aria-label="Misure elettriche salvate nel tempo"></canvas>
-        <p id="power-history-info" class="caption">Il grafico mostra fino a 600 letture; il CSV contiene l’intera sessione.</p>
-        <p class="caption">Tempo dalla partenza dell’App (s). Le pause restano vuote; i valori negativi mantengono il segno della misura.</p>
-      </article>
-      <article class="card sensors">
+    <div id="panel-vibrazioni" class="tab-panel" role="tabpanel" aria-labelledby="tab-vibrazioni" tabindex="0" hidden>
+      <div class="panel-heading"><h2>Vibrazioni e AI</h2><p class="muted">Seleziona una cattura, confronta le firme e consulta lo storico.</p></div>
+    <section class="card waveform">
+      <div class="section-title"><div><p class="eyebrow">RISPOSTA MECCANICA</p><h2>Forma d’onda dell’impatto</h2></div><label class="option"><input type="checkbox" id="follow" checked> Segui ultimo evento</label></div>
+      <div class="wave-controls"><label for="event-select">Evento</label><select id="event-select"><option value="">Nessun evento salvato</option></select><label class="option"><input type="checkbox" id="remove-offset" checked> Sottrai media pretrigger</label></div>
+      <p id="event-info" class="muted">Fai cadere la pallina solo quando il sistema indica READY.</p>
+      <canvas id="wave-chart" class="wave-chart" role="img" aria-label="Accelerazione X Y Z attorno al trigger piezo"></canvas>
+      <div class="chart-footer"><div class="legend"><span class="x">● X</span><span class="y">● Y</span><span class="z">● Z</span><span class="muted">Tempo dal trigger (ms) · accelerazione (g)</span></div><div class="downloads"><a id="csv-download" class="button" hidden>Scarica CSV</a><a id="json-download" class="button secondary" hidden>Metadati JSON</a></div></div>
+      <p id="event-reasons" class="error" hidden></p>
+      <p class="caption">La sottrazione dell’offset modifica solo il grafico. Il CSV scaricato conserva i dati originali.</p>
+    </section>
+
+    <section id="ai-panel" class="card ai-panel" aria-live="polite">
+      <div class="section-title"><h2>Firma vibrazionale · Edge AI</h2><span id="ai-connection" class="badge">Avvio modello</span></div>
+      <details id="ai-form-settings" class="settings-panel">
+        <summary>Impostazioni del modello e del LED</summary>
+      <p id="ai-model" class="caption">Modello personalizzato: ei-model-1136239-1</p>
+      <form id="ai-form" class="economic-form">
+        <label>Soglia usata in Edge Impulse<input id="ai-threshold" type="number" step="any" placeholder="Inserisci il valore di Edge Impulse" required></label>
+        <label class="option"><input id="ai-alerts" type="checkbox" checked> Attiva il LED D7 oltre soglia</label>
+        <div class="economic-save"><button id="ai-save" class="button secondary" type="submit">Salva soglia AI</button></div>
+      </form>
+      </details>
+      <div class="demo-actions"><button id="ai-analyze" class="button secondary" type="button" disabled>Analizza evento selezionato</button><button id="ai-synthetic" class="button" type="button" disabled>Esegui TEST SINTETICO</button><a id="ai-report" class="button secondary" hidden>Scarica risultato JSON</a></div>
+      <p id="ai-status" class="muted">Le nuove catture vengono analizzate dopo il salvataggio del CSV.</p>
+      <p id="ai-origin" class="ai-origin" hidden>TEST SINTETICO — firma alterata artificialmente</p>
+      <div class="demo-metrics"><div><span class="label">ULTIMO SCORE REALE</span><strong id="ai-real-score">—</strong></div><div><span class="label">ULTIMO SCORE SINTETICO</span><strong id="ai-synthetic-score">—</strong></div><div><span class="label">ESITO DEL RISULTATO VISUALIZZATO</span><strong id="ai-decision">—</strong></div><div><span class="label">TEMPO DI INFERENZA</span><strong><span id="ai-latency">—</span> <small>ms</small></strong></div></div>
+      <canvas id="ai-chart" class="wave-chart" role="img" aria-label="Confronto della componente dinamica dell'accelerazione reale e sintetica"></canvas>
+      <p id="ai-plot-info" class="caption">Modulo dell'accelerazione dinamica (g), tempo dal trigger (ms). Originale in verde, copia sintetica in arancione tratteggiato. La sottrazione dell'offset riguarda solo il grafico.</p>
+      <p id="ai-error" class="error" hidden></p>
+      <details class="history-details"><summary>Storico delle inferenze AI</summary>
+      <div class="table-scroll"><table><thead><tr><th>Evento / origine</th><th>Esito</th><th>Score / soglia</th><th>Dettaglio</th></tr></thead><tbody id="ai-history"></tbody></table></div>
+      </details>
+      <details class="help-details"><summary>Dettagli del test sintetico</summary>
+      <p class="caption">Il test sintetico aggiunge oscillazioni persistenti di 0,35 g sui tre assi a 8/17/29 Hz, con rampa di 50 ms. Non incrementa il contatore degli impatti. Dimostra la risposta software del modello e non certifica danni fisici. Prima della prova puoi confermare/reset dell'allerta precedente nel tab Segnalazioni.</p>
+      </details>
+    </section>
+
+      <details class="card sensors sensor-details">
+        <summary>Diagnostica sensori live</summary>
         <div class="section-title"><h2>Sensori live</h2><span class="muted">Anteprima ~1 Hz</span></div>
         <div class="axes"><div><span class="axis x">X</span><strong id="ax">—</strong><small>g</small></div><div><span class="axis y">Y</span><strong id="ay">—</strong><small>g</small></div><div><span class="axis z">Z</span><strong id="az">—</strong><small>g</small></div></div>
         <dl><div><dt>Piezo A0 · ADC / picco</dt><dd id="piezo">—</dd></div><div><dt>Piezo sopra soglia</dt><dd id="piezo-active">—</dd></div><div><dt>Fronti / soppressi dal lockout</dt><dd id="crossings">—</dd></div><div><dt>INA219</dt><dd id="ina-state">In attesa</dd></div></dl>
         <p class="caption">X/Y/Z includono la gravità. Questa anteprima non rappresenta la forma d’onda dell’impatto.</p>
-      </article>
-    </section>
+      </details>
 
+    <details class="card archive">
+      <summary>Archivio delle acquisizioni <span id="event-count" class="muted">0 eventi</span></summary>
+      <div class="table-scroll"><table><thead><tr><th>Evento</th><th>Qualità acquisizione</th><th>Campioni</th><th>Frequenza media</th><th>File</th></tr></thead><tbody id="events-body"><tr><td colspan="5" class="muted">In attesa delle acquisizioni.</td></tr></tbody></table></div>
+    </details>
+    </div>
+
+    <div id="panel-energia" class="tab-panel" role="tabpanel" aria-labelledby="tab-energia" tabindex="0" hidden>
+      <div class="panel-heading"><h2>Energia e costi</h2><p class="muted">Confronta la produzione e consulta lo scenario economico ipotetico.</p></div>
     <section class="card electrical-demo">
       <div class="section-title"><div><p class="eyebrow">CONFRONTO ELETTRICO CONTROLLATO</p><h2>Quanto cambia la produzione?</h2></div><span class="chip">Oscuramento simulato</span></div>
       <p class="muted">Mantieni illuminazione, posizione e carico invariati. Acquisisci il riferimento, avvia il confronto e poi copri una parte del pannello.</p>
@@ -95,6 +137,8 @@
     <section class="card economic-scenario">
       <div class="section-title"><div><p class="eyebrow">IMPATTO ECONOMICO</p><h2>Scenario domestico ipotetico</h2></div><span class="chip">Ipotesi modificabili</span></div>
       <p class="muted">I valori iniziali sono esempi. Inserisci produzione e prezzi del tuo contratto, con costi variabili per kWh e senza quote fisse. La stessa riduzione su un impianto domestico è un’ipotesi da verificare.</p>
+      <details id="economic-form-settings" class="settings-panel">
+        <summary>Impostazioni dello scenario e delle tariffe</summary>
       <form id="economic-form" class="economic-form">
         <label>Produzione abituale (kWh/giorno)<input id="scenario-daily" name="daily_kwh" type="number" min="0.001" max="100000" step="any" required></label>
         <label>Durata ipotizzata (giorni)<input id="scenario-days" name="days" type="number" min="1" max="3650" step="1" required></label>
@@ -105,26 +149,65 @@
         <label>Riduzione manuale (%)<input id="scenario-reduction" name="assumed_reduction_pct" type="number" min="0" max="100" step="any" required></label>
         <div class="economic-save"><button id="economic-save" class="button" type="submit">Salva parametri</button><span id="economic-save-status" class="caption" aria-live="polite"></span></div>
       </form>
+      </details>
       <div class="demo-metrics scenario-values"><div><span class="label">RIDUZIONE IPOTIZZATA</span><strong><span id="scenario-effective">—</span> <small>%</small></strong></div><div><span class="label">ENERGIA MANCANTE</span><strong><span id="scenario-kwh">—</span> <small>kWh</small></strong></div><div><span class="label">MAGGIORE SPESA ACQUISTO</span><strong><span id="scenario-self-cost">—</span> <small>€</small></strong></div><div class="scenario-total"><span class="label">IMPATTO ECONOMICO TOTALE</span><strong><span id="scenario-total">—</span> <small>€</small></strong></div></div>
       <p id="scenario-description" class="caption">Acquisisci un confronto oppure scegli una riduzione manuale per vedere lo scenario.</p>
       <p class="caption">Il totale comprende maggiore spesa per autoconsumo perso e mancato ricavo dalla vendita. Non include riparazioni, incentivi o assicurazioni. Tariffe costanti per il periodo ipotizzato; nessun aggiornamento online automatico.</p>
     </section>
 
-    <section class="card waveform">
-      <div class="section-title"><div><p class="eyebrow">RISPOSTA MECCANICA</p><h2>Forma d’onda dell’impatto</h2></div><label class="option"><input type="checkbox" id="follow" checked> Segui ultimo evento</label></div>
-      <div class="wave-controls"><label for="event-select">Evento</label><select id="event-select"><option value="">Nessun evento salvato</option></select><label class="option"><input type="checkbox" id="remove-offset" checked> Sottrai media pretrigger</label></div>
-      <p id="event-info" class="muted">Fai cadere la pallina solo quando il sistema indica READY.</p>
-      <canvas id="wave-chart" class="wave-chart" role="img" aria-label="Accelerazione X Y Z attorno al trigger piezo"></canvas>
-      <div class="chart-footer"><div class="legend"><span class="x">● X</span><span class="y">● Y</span><span class="z">● Z</span><span class="muted">Tempo dal trigger (ms) · accelerazione (g)</span></div><div class="downloads"><a id="csv-download" class="button" hidden>Scarica CSV</a><a id="json-download" class="button secondary" hidden>Metadati JSON</a></div></div>
-      <p id="event-reasons" class="error" hidden></p>
-      <p class="caption">La sottrazione dell’offset modifica solo il grafico. Il CSV scaricato conserva i dati originali.</p>
+      <article class="card power-history-panel">
+        <div class="section-title"><h2>Storico elettrico</h2><span class="muted">Salvataggio automatico sulla UNO Q</span></div>
+        <div class="history-controls"><label for="power-session">Sessione</label><select id="power-session"><option value="">In attesa della prima misura</option></select></div>
+        <div class="history-actions"><label class="option"><input type="checkbox" id="power-follow" checked> Segui sessione corrente</label><select id="power-quantity" aria-label="Grandezza elettrica"><option value="3">Potenza · mW</option><option value="1">Tensione · V</option><option value="2">Corrente · mA</option></select><a id="power-download" class="button" hidden>Scarica storico CSV</a></div>
+        <p id="power-log-status" class="caption" aria-live="polite">In attesa della registrazione.</p>
+        <p id="power-history-error" class="error" hidden></p>
+        <canvas id="power-chart" class="power-chart" role="img" aria-label="Misure elettriche salvate nel tempo"></canvas>
+        <p id="power-history-info" class="caption">Il grafico mostra fino a 600 letture; il CSV contiene l’intera sessione.</p>
+        <p class="caption">Tempo dalla partenza dell’App (s). Le pause restano vuote; i valori negativi mantengono il segno della misura.</p>
+      </article>
+    </div>
+
+    <div id="panel-segnalazioni" class="tab-panel" role="tabpanel" aria-labelledby="tab-segnalazioni" tabindex="0" hidden>
+      <div class="panel-heading"><h2>Segnalazioni e ispezione</h2><p class="muted">Consulta il motivo dell’allerta e invia i dati via Telegram.</p></div>
+    <section id="inspection-panel" class="card inspection-panel" aria-live="polite">
+      <div class="section-title"><h2 id="inspection-title">Segnalazione di ispezione</h2><span id="inspection-led" class="badge">LED in attesa</span></div>
+      <p id="inspection-reason" class="muted">Acquisisci il riferimento elettrico prima degli impatti.</p>
+      <p id="inspection-progress" class="caption">In attesa delle misure.</p>
+      <div class="demo-actions"><button id="inspection-reset" class="button" type="button" disabled>Conferma / reset allerta</button></div>
+      <details id="inspection-form-settings" class="settings-panel">
+        <summary>Impostazioni dell’allerta elettrica</summary>
+      <form id="inspection-form" class="economic-form">
+        <label>Impatti dopo il riferimento<input id="inspection-impacts" type="number" min="1" max="1000" step="1" required></label>
+        <label>Calo minimo di potenza (%)<input id="inspection-drop" type="number" min="1" max="100" step="any" required></label>
+        <label>Letture consecutive sotto soglia<input id="inspection-samples" type="number" min="2" max="120" step="1" required></label>
+        <div class="economic-save"><button id="inspection-save" class="button secondary" type="submit">Salva soglie LED</button></div>
+      </form>
+      </details>
+      <p id="inspection-error" class="error" hidden></p>
+      <p class="caption">Soglie elettriche iniziali per la demo, da calibrare. Il calo può dipendere da ombra, luce o carico: non dimostra un danno causato dagli impatti. L’allerta resta attiva fino al reset. Le allerte AI sono sperimentali; un test sintetico mantiene sempre la propria indicazione.</p>
     </section>
 
-    <section class="card archive">
-      <div class="section-title"><h2>Eventi salvati</h2><span id="event-count" class="muted">0 eventi</span></div>
-      <div class="table-scroll"><table><thead><tr><th>Evento</th><th>Qualità acquisizione</th><th>Campioni</th><th>Frequenza media</th><th>File</th></tr></thead><tbody id="events-body"><tr><td colspan="5" class="muted">In attesa delle acquisizioni.</td></tr></tbody></table></div>
+    <section class="card telegram-panel">
+      <div class="section-title"><h2>Segnalazione via Telegram</h2><span id="telegram-connection" class="badge">In attesa</span></div>
+      <p class="muted">Invia i dati del pannello alla tua chat di test. Dal telefono, invia <strong>/start</strong> al bot per conoscere il Chat ID, poi salvalo qui.</p>
+      <details id="telegram-form-settings" class="settings-panel">
+        <summary>Impostazioni Telegram e destinatario</summary>
+      <form id="telegram-form" class="economic-form">
+        <label>Identificativo pannello<input id="telegram-panel-id" type="text" maxlength="64" required></label>
+        <label>Chat ID della chat privata<input id="telegram-chat-id" type="text" inputmode="numeric" pattern="[1-9][0-9]{0,15}" placeholder="Chat ID restituito dal bot" required></label>
+        <div class="economic-save"><button id="telegram-save" class="button secondary" type="submit">Salva destinatario</button><button id="telegram-reconnect" class="button secondary" type="button">Riconnetti</button></div>
+      </form>
+      </details>
+      <div class="demo-actions"><button id="telegram-preview-button" class="button secondary" type="button">Anteprima dati</button><button id="telegram-send" class="button" type="button" disabled>Invia segnalazione</button></div>
+      <pre id="telegram-preview" class="telegram-preview" hidden></pre>
+      <p id="telegram-status" class="caption" aria-live="polite">Configura il destinatario. Il token resta nel campo segreto del brick in App Lab.</p>
+      <p id="telegram-diagnostic" class="caption" aria-live="polite"></p>
+      <p id="telegram-error" class="error" hidden></p>
+      <div class="table-scroll"><table><thead><tr><th>Richiesta</th><th>Data</th><th>Esito</th><th>Azioni</th></tr></thead><tbody id="telegram-history"></tbody></table></div>
+      <p class="caption">Invio soltanto su richiesta. "Inviato" indica accettazione da Telegram, non lettura dell'operatore. Se l'esito non è confermato, controlla la chat prima di riprovare: potrebbero arrivare duplicati. I dati mancanti restano indicati come non disponibili.</p>
     </section>
-    <footer>Elaborazione locale · Nessun servizio cloud necessario<br>Il sistema registra variazioni meccaniche. Queste misure non certificano danni o microfratture.</footer>
+    </div>
+    <footer>Acquisizione e inferenza locali · Telegram richiede Internet<br>Le misure non certificano danni o microfratture.</footer>
   </main>
 </body>
 </html>

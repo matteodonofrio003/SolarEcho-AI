@@ -6,6 +6,7 @@ from power_history import PowerHistory
 from electrical_demo import ElectricalDemo
 from inspection_alert import InspectionAlert
 from telegram_notifications import TelegramNotifications
+from vibration_ai import VibrationAI
 
 import csv
 import json
@@ -32,7 +33,8 @@ power_history = PowerHistory(OUTPUT_DIR.parent / "power", session_id)
 electrical_demo = ElectricalDemo(OUTPUT_DIR.parent / "analysis", power_history)
 inspection = InspectionAlert(OUTPUT_DIR.parent / "analysis")
 notifications = TelegramNotifications(OUTPUT_DIR.parent / "notifications")
-dashboard = Dashboard(OUTPUT_DIR, session_id, power_history, electrical_demo, inspection, notifications)
+vibration_ai = VibrationAI(OUTPUT_DIR.parent / "ai", inspection)
+dashboard = Dashboard(OUTPUT_DIR, session_id, power_history, electrical_demo, inspection, notifications, vibration_ai)
 next_led_sync_at = 0.0
 
 
@@ -154,6 +156,10 @@ def finish_capture(count, overflow, additional_events, timed_out=False):
         print(f"ERRORE salvataggio: {error}. Acquisizione sospesa; correggere e riavviare la App.")
     else:
         try:
+            vibration_ai.submit(destination)
+        except RuntimeError as error:
+            print(f"AI: evento non accodato ({error}); CSV conservato.")
+        try:
             result = Bridge.call("solarecho_ack", capture_id)
             if result != 1:
                 halted = True
@@ -170,6 +176,7 @@ def finish_capture(count, overflow, additional_events, timed_out=False):
 def loop():
     global pending, armed, halted, next_arm_at, next_led_sync_at
     notifications.start()  # Thread avviato dopo App.run; inizializzazione rete fuori dal main.
+    vibration_ai.start()
 
     if not armed and not halted and time.monotonic() >= next_arm_at:
         next_arm_at = time.monotonic() + 1.0
@@ -239,4 +246,5 @@ def loop():
 try:
     App.run(user_loop=loop)
 finally:
+    vibration_ai.stop()
     notifications.stop()

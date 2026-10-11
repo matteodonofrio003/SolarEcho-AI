@@ -29,6 +29,7 @@ $files = @(
     'python/main.py', 'python/dashboard.py', 'python/power_history.py', 'python/electrical_demo.py',
     'python/inspection_alert.py',
     'python/telegram_notifications.py',
+    'python/vibration_ai.py',
     'assets/index.html', 'assets/style.css', 'assets/dashboard.js'
 )
 
