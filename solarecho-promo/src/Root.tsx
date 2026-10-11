@@ -20,6 +20,7 @@ import { Dashboard } from "./scenes/Dashboard";
 import { Research } from "./scenes/Research";
 import { Closing } from "./scenes/Closing";
 import { C, EchoMark, clamp } from "./design";
+import { HackathonCompositions } from "./hackathon/Hackathon";
 
 loadFont({
   family: "SolarDisplay",
@@ -195,6 +196,7 @@ export const SolarEchoPromo: React.FC = () => {
 };
 export const RemotionRoot: React.FC = () => (
   <>
+    <HackathonCompositions />
     <Composition
       id="SolarEcho-Promo"
       component={SolarEchoPromo}

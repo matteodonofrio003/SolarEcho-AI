@@ -1,158 +1,81 @@
-# SolarEcho AI — sceneggiatura hackathon
+# SolarEcho AI — sceneggiatura definitiva
 
-**Durata pianificata: 118 secondi / 3.540 fotogrammi a 30 fps.**
-**Stato: bozza pronta per l'integrazione delle riprese fisiche attese.**
+Durata: **118 secondi**, 3.540 fotogrammi a 30 fps. Formato 16:9, Full HD.
 
-Le durate comprendono le transizioni. Nessun risultato visivo viene inventato.
-Le inquadrature fisiche saranno selezionate dopo l'analisi dei nuovi file.
-La registrazione disponibile documenta acquisizione, AI e segnalazione.
+Voce italiana neurale Diego; sottotitoli sincronizzati alle parole e inclusi nel video. Musica originale composta proceduralmente per questo montaggio.
 
 ## 00:00–00:18 — Il problema
 
-**Voce prevista**
+**Voce:** Un impatto può durare un istante. Le sue conseguenze possono durare anni. Grandine, vento e urti mettono alla prova i pannelli. Un’alterazione non sempre si vede subito. Capire quando controllare protegge produzione e risorse.
 
-«Un impatto può durare un istante. Le sue conseguenze possono durare anni.
-Grandine, vento e urti mettono alla prova i pannelli fotovoltaici.
-Un'alterazione non sempre si vede subito. Capire quando controllare significa
-proteggere produzione, tempo e risorse.»
+**Immagini e regia:** Fotografia al sole → prova controllata all’aperto in replay 0,5× → push-in video del pannello. Titoli cinematografici con richiamo a grandine, vento e urti. Nessuna grandinata simulata presentata come reale.
 
-**Testi essenziali**
-
-- Un istante.
-- Conseguenze nel tempo.
-- E se il pannello potesse avvisarci?
-
-**Immagini**: apertura su pannello reale; dettaglio e impatto controllato,
-se presenti nei nuovi materiali. Richiami a grandine e vento con grafica
-esplicativa, senza spacciare la prova con pallina per evento meteorologico.
-
-**Regia**: primo suono breve, nero iniziale, titolo con ingresso preciso,
-alternanza di inquadrature ampie e dettagli. La parola «danno» non compare
-come risultato attribuito a un urto osservato.
+**Audio:** ingresso voce a 0.8 s; durata 16.60 s. Musica sotto il parlato.
 
 ## 00:18–00:38 — La soluzione
 
-**Voce prevista**
+**Voce:** Solar Echo AI ascolta la firma vibrazionale del pannello. Il piezo rileva l’impatto. Il sensore di movimento misura le vibrazioni sui tre assi. Arduino UNO Q raccoglie i dati e li analizza sul dispositivo. È Edge AI: intelligenza artificiale locale.
 
-«SolarEcho AI ascolta la firma vibrazionale del pannello. Il piezo rileva
-l'impatto. Il sensore di movimento misura le vibrazioni sui tre assi.
-Arduino UNO Q raccoglie i dati e li analizza sul dispositivo:
-è Edge AI, intelligenza artificiale locale.»
+**Immagini e regia:** Reveal SolarEcho AI; fotografia frontale; orbit video; dettaglio elettronica e callout UNO Q. Piezo: trigger. IMU: vibrazioni XYZ. Diagramma essenziale del percorso.
 
-**Testi**: SOLARECHO AI / Piezo: trigger / IMU: vibrazioni / UNO Q: analisi locale.
+**Audio:** ingresso voce a 18.8 s; durata 18.70 s. Musica sotto il parlato.
 
-**Immagini**: prototipo reale e fotografie dei componenti; callout soltanto
-su componenti identificabili. Schema essenziale sensori → UNO Q → dashboard.
-INA219 può essere mostrato come monitor elettrico, separato dal rilevamento
-delle anomalie vibrazionali.
+## 00:38–00:47 — Demo: impatto
 
-**Regia**: reveal del nome, dettagli hardware, linee sottili e tre etichette
-animate in successione. Esplicitare il contributo dell'IMU evita di attribuire
-al solo piezo la forma d'onda XYZ.
+**Voce:** La pallina colpisce il pannello. Il sistema rileva l’urto: da solo, non dimostra un danno.
 
-## 00:38–00:80 — Funzionamento e demo autentica
+**Immagini e regia:** Ripresa principale: sorgente 6,30–9,80 s a velocità normale; replay da 7,15 s a metà velocità. Nessuna diagnosi di danno associata al contatto.
 
-### 00:38–00:47 — Impatto
+**Audio:** ingresso voce a 38.8 s; durata 7.61 s. Musica sotto il parlato.
 
-**Voce**: «Durante un impatto controllato, il sistema registra la risposta
-del pannello. Rilevare l'urto è il primo passo: non significa aver rilevato un danno.»
+## 00:47–00:57 — Demo: acquisizione
 
-**Immagini**: lancio reale, contatto e reazione. Eventuale replay a metà
-velocità chiaramente identificato; suono dell'urto solo se disponibile o
-effetto discreto usato come sound design, senza alterare la dimostrazione.
+**Voce:** I sensori misurano la risposta. La dashboard mostra le vibrazioni sui tre assi: una traccia registrata, insieme ai dati dell’evento.
 
-### 00:47–00:57 — Acquisizione
+**Immagini e regia:** Dashboard da 19,30 a 21,90 s, poi fermoimmagine autentico al secondo 22. Grafico originale XYZ, unità g e tempo dal trigger in ms. Filmato fisico e registrazione sono inserti montati: non si dichiara una sincronizzazione temporale tra le due sorgenti.
 
-**Voce**: «La dashboard mostra l'acquisizione: le vibrazioni diventano
-una traccia misurabile, salvata insieme ai dati dell'evento.»
+**Audio:** ingresso voce a 47.5 s; durata 8.80 s. Musica sotto il parlato.
 
-**Immagini**: registrazione dashboard circa 18–23 s, grafico XYZ.
-Una traccia CSV della repository può spiegare il segnale, con etichetta
-«Acquisizione dal dataset» se non è identificabile come lo stesso impatto filmato.
+## 00:57–01:09 — Demo: analisi AI
 
-### 00:57–00:69 — Analisi locale
+**Voce:** Il modello confronta il segnale con il riferimento. Lo score misura lo scostamento dalla firma normale: non è una percentuale di danno.
 
-**Voce**: «Il modello confronta il segnale con il comportamento di riferimento.
-Lo score indica quanto la risposta si discosta dalla baseline.
-Non è una percentuale di danno.»
+**Immagini e regia:** Dettaglio dello score reale 0,6035 dal fotogramma a 24 s. Soglia configurata 0,3000; nessuna probabilità di danno. Poi laptop nella ripresa principale e schema Impatto → Vibrazione → Analisi AI → Segnalazione.
 
-**Immagini**: dashboard circa 23–26 s e schema animato del percorso reale.
-Mostrare i valori originali, senza trasformare lo score in probabilità.
+**Audio:** ingresso voce a 57.5 s; durata 9.41 s. Musica sotto il parlato.
 
-### 00:69–00:80 — Segnalazione e limiti della prova
+## 01:09–01:20 — Demo: risultato e limiti
 
-**Voce**: «Oltre soglia, viene consigliata un'ispezione. La demo mostra anche
-una firma alterata artificialmente: è un test software, distinto dalla
-validazione dei danni fisici.»
+**Voce:** Oltre soglia, l’ispezione è consigliata. Dashboard e LED mostrano la segnalazione. Il test sintetico non dimostra danni fisici.
 
-**Immagini**: dashboard circa 43–47 s, «Ispezione consigliata», LED rosso acceso
-come stato nell'interfaccia. Ripresa del LED fisico solo se realmente disponibile.
-Breve inserto del test a circa 27–33 s con dicitura grande e persistente
-«TEST SINTETICO — firma alterata artificialmente».
+**Immagini e regia:** Avviso originale “Ispezione consigliata” dal fotogramma a 44 s, affiancato alla ripresa del LED. Inserto test sintetico: video 29–30 s, poi fermoimmagine a 29 s; indicazione persistente di test software, non prova di danno fisico.
 
-**Regia**: la catena «Impatto → Vibrazione → Analisi AI → Segnalazione»
-si completa. Non attribuire la segnalazione della registrazione a una nuova
-ripresa se manca una corrispondenza verificabile fra gli eventi.
+**Audio:** ingresso voce a 69.4 s; durata 10.00 s. Musica sotto il parlato.
 
-## 00:80–01:42 — Valore economico
+## 01:20–01:42 — Valore economico
 
-**Voce prevista**
+**Voce:** Per chi gestisce un impianto, la domanda è: dove intervenire prima? Ai controlli programmati, Solar Echo AI affianca segnali per dare priorità alle ispezioni. L’obiettivo: meno controlli inutili, interventi più mirati e costi potenzialmente ridotti. Benefici da validare sul campo.
 
-«Per chi gestisce un impianto, la domanda è: dove intervenire prima?
-Ai controlli programmati, SolarEcho AI affianca segnali utili per dare
-priorità alle ispezioni. L'obiettivo è ridurre i controlli superflui,
-indirizzare gli interventi e limitare i costi evitabili.»
+**Immagini e regia:** Confronto animato tra calendario e priorità; schema illustrativo senza conteggi o percentuali. Chiusura: meno controlli inutili, interventi più mirati, costi potenzialmente ridotti. Benefici da validare.
 
-**Confronto animato**
-
-| Controlli programmati | Manutenzione supportata da SolarEcho AI |
-| --- | --- |
-| Visite secondo calendario | Eventi e variazioni osservabili |
-| Tempo dedicato ai controlli | Priorità alle situazioni sospette |
-| Risorse per ispezioni diffuse | Interventi potenzialmente più mirati |
-
-**Messaggio**: «Meno controlli inutili. Interventi più mirati.
-Costi potenzialmente ridotti.»
-
-Benefici prospettici, senza percentuali, tariffe, ROI o risparmi misurati.
-Non si afferma che il prototipo sostituisca le ispezioni o abbia già ridotto i costi.
-La sezione economica della dashboard può comparire come strumento di scenario,
-con dicitura «Scenario ipotetico», se utile al montaggio finale.
+**Audio:** ingresso voce a 80.8 s; durata 20.20 s. Musica sotto il parlato.
 
 ## 01:42–01:52 — Innovazione
 
-**Voce prevista**
+**Voce:** Firma vibrazionale e AI locale. Manutenzione intelligente. Prossimo passo: validazione su alterazioni fisiche.
 
-«Sensori accessibili, firma vibrazionale e analisi locale.
-Un prototipo concreto verso una manutenzione più intelligente.
-La validazione su alterazioni fisiche resta il prossimo passo.»
+**Immagini e regia:** Montage sensori, elettronica, prototipo con laptop. Analisi locale e firma vibrazionale. Prossimo passo esplicito: validazione del modello su alterazioni fisiche.
 
-**Immagini**: montage reale di pannello, componenti, acquisizione e segnalazione.
-Tre parole forti: FIRMA VIBRAZIONALE / EDGE AI / ISPEZIONI MIRATE.
+**Audio:** ingresso voce a 102.5 s; durata 8.70 s. Musica sotto il parlato.
 
 ## 01:52–01:58 — Finale
 
-**Voce prevista**
+**Voce:** Solar Echo AI. Il pannello che riconosce i propri danni.
 
-«SolarEcho AI. Il pannello che riconosce i propri danni.»
+**Immagini e regia:** Prototipo reale, nome e slogan richiesto. Indicazione “Prototipo sperimentale”. Risoluzione musicale originale e dissolvenza al nero.
 
-**Immagini**: ripresa finale reale del prototipo, nome e slogan approvato.
-Contesto già spiegato: segnalazione di possibili anomalie, nessuna diagnosi certa.
-Breve indicazione «Prototipo sperimentale»; musica risolta e dissolvenza.
+**Audio:** ingresso voce a 112.6 s; durata 4.90 s. Musica sotto il parlato.
 
-## Audio e sottotitoli
+## Correttezza tecnica
 
-La voce italiana viene generata solo dopo aver fissato il montaggio e verificato
-la qualità del servizio disponibile. È presente una voce italiana locale
-Windows (Microsoft Elsa Desktop); non sono configurate chiavi TTS esterne.
-Se non si ottiene un parlato adeguato, la versione completa userà titoli,
-testi brevi e musica originale, come autorizzato.
-Se viene aggiunto il parlato: musica abbassata e sottotitoli italiani sincronizzati.
-
-## Verifiche necessarie sui nuovi materiali
-
-- Identificare visivamente pannello, UNO Q, piezo, IMU e altri componenti mostrati.
-- Localizzare il contatto reale della pallina fotogramma per fotogramma.
-- Stabilire se i risultati della dashboard corrispondono alla ripresa fisica.
-- Mostrare un eventuale LED soltanto nel contesto e nell'origine corretti.
-- Conservare il carattere sintetico degli esperimenti software.
+Il piezo rileva il trigger dell’impatto; l’IMU acquisisce le vibrazioni XYZ. La forma d’onda non è attribuita al piezo. L’AI locale integrata su UNO Q confronta la firma con il riferimento; lo score non è una percentuale di danno. L’allerta è sperimentale e propone un controllo. Il test sintetico è distinto dalla prova fisica e dalla validazione su danni. Nessun risparmio, precisione o risultato di danno viene inventato. Lo slogan finale esprime il concept e resta accompagnato dal contesto sperimentale.

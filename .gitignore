@@ -1,6 +1,40 @@
-__pycache__/
-*.py[cod]
+# Ambiente e segreti
 .env
 .env.*
 !.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.venv/
+venv/
+ENV/
+
+# Dati creati durante l'esecuzione dell'app sull'UNO Q
 app/data/
+
+# File temporanei e output locali
+tmp/
+video_output/
+*.tmp
+*.temp
+
+# Progetto Remotion: dipendenze e render rigenerabili
+solarecho-promo/node_modules/
+solarecho-promo/dist/
+solarecho-promo/out/
+
+# Editor e sistema operativo
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+desktop.ini

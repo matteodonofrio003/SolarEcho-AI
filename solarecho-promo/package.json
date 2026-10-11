@@ -29,6 +29,8 @@
     "render": "remotion render src/index.ts SolarEcho-Promo out/SolarEcho-AI-promo-1080p.mp4 --codec=h264 --crf=18 --audio-bitrate=320k --pixel-format=yuv420p --color-space=bt709 --concurrency=4",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
+    "lint": "eslint src && tsc",
+    "render:hackathon": "remotion render src/index.ts SolarEcho-Hackathon ../video_output/SolarEcho_AI_finale.mp4 --codec=h264 --crf=18 --audio-bitrate=256k --pixel-format=yuv420p --color-space=bt709 --concurrency=3",
+    "preview:hackathon": "remotion render src/index.ts SolarEcho-Hackathon ../video_output/SolarEcho_AI_anteprima.mp4 --codec=h264 --scale=0.6666666666666666 --crf=25 --audio-bitrate=192k --pixel-format=yuv420p --color-space=bt709 --concurrency=3"
   }
 }

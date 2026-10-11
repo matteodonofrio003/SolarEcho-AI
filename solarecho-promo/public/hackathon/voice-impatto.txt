@@ -1,0 +1,1 @@
+La pallina colpisce il pannello. Il sistema rileva l’urto: da solo, non dimostra un danno.

@@ -1,0 +1,1 @@
+I sensori misurano la risposta. La dashboard mostra le vibrazioni sui tre assi: una traccia registrata, insieme ai dati dell’evento.

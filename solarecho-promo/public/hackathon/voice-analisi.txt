@@ -1,0 +1,1 @@
+Il modello confronta il segnale con il riferimento. Lo score misura lo scostamento dalla firma normale: non è una percentuale di danno.
