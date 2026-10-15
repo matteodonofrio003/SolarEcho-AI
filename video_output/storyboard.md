@@ -26,6 +26,6 @@ Le transizioni principali sono dissolvenze di 15 fotogrammi; gli inserti della d
 
 ## Trattamento e integrità delle sorgenti
 
-I filmati telefonici sono realmente verticali, con metadati di rotazione −90°. Sono convertiti in H.264 720×1280 a 60 fps per il montaggio, mantenendo proporzioni e contenuto. Il master è 1920×1080, 30 fps. Leggera correzione cromatica uniforme. Nessuna interpolazione di impatti, danni aggiunti o modifica dei risultati. I fermoimmagine provengono dalla registrazione originale e sono dichiarati. Il callout UNO Q punta alla scheda identificabile nella fotografia posteriore; altri componenti sono spiegati per funzione senza identificazioni visive ambigue.
+I filmati telefonici sono realmente verticali, con metadati di rotazione −90°. Sono convertiti in H.264 720×1280 a 60 fps per il montaggio, mantenendo proporzioni e contenuto. Il master è 1920×1080, 30 fps. Leggera correzione cromatica uniforme. Nessuna interpolazione di impatti, danni aggiunti o modifica dei risultati. I fermoimmagine provengono dalla registrazione originale e sono dichiarati. La linea grafica collega analisi locale ed elettronica reale; la scheda UNO Q e visibile nella fotografia posteriore. Gli altri componenti sono spiegati per funzione, senza etichette su elementi di identificazione incerta.
 
 I quadrati nella comparazione economica sono elementi grafici illustrativi e non rappresentano un numero di pannelli, visite o un risparmio misurato. Nessuna notifica Telegram automatica è attribuita al modello.
