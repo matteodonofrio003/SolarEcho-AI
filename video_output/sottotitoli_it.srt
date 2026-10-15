@@ -1,0 +1,135 @@
+1
+00:00:00,895 --> 00:00:03,707
+Un impatto può durare un istante. Le
+
+2
+00:00:03,718 --> 00:00:07,648
+sue conseguenze possono durare anni. Grandine, vento
+
+3
+00:00:07,660 --> 00:00:09,520
+e urti mettono alla prova i pannelli.
+
+4
+00:00:10,334 --> 00:00:13,857
+Un’alterazione non sempre si vede subito. Capire
+
+5
+00:00:13,869 --> 00:00:16,578
+quando controllare protegge produzione e risorse.
+
+6
+00:00:18,895 --> 00:00:21,368
+Solar Echo AI ascolta la firma vibrazionale
+
+7
+00:00:21,379 --> 00:00:25,506
+del pannello. Il piezo rileva l’impatto. Il
+
+8
+00:00:25,518 --> 00:00:27,908
+sensore di movimento misura le vibrazioni sui
+
+9
+00:00:27,920 --> 00:00:30,859
+tre assi. Arduino UNO Q raccoglie i
+
+10
+00:00:30,871 --> 00:00:33,833
+dati e li analizza sul dispositivo. È
+
+11
+00:00:33,845 --> 00:00:36,667
+Edge AI: intelligenza artificiale locale.
+
+12
+00:00:38,898 --> 00:00:42,298
+La pallina colpisce il pannello. Il sistema
+
+13
+00:00:42,310 --> 00:00:45,026
+rileva l’urto: da solo, non dimostra un
+
+14
+00:00:45,038 --> 00:00:45,555
+danno.
+
+15
+00:00:47,587 --> 00:00:50,739
+I sensori misurano la risposta. La dashboard
+
+16
+00:00:50,750 --> 00:00:52,852
+mostra le vibrazioni sui tre assi: una
+
+17
+00:00:52,863 --> 00:00:55,539
+traccia registrata, insieme ai dati dell’evento.
+
+18
+00:00:57,598 --> 00:00:59,629
+Il modello confronta il segnale con il
+
+19
+00:00:59,641 --> 00:01:03,197
+riferimento. Lo score misura lo scostamento dalla
+
+20
+00:01:03,209 --> 00:01:05,517
+firma normale: non è una percentuale di
+
+21
+00:01:05,529 --> 00:01:06,046
+danno.
+
+22
+00:01:09,492 --> 00:01:13,528
+Oltre soglia, l’ispezione è consigliata. Dashboard e
+
+23
+00:01:13,539 --> 00:01:17,047
+LED mostrano la segnalazione. Il test sintetico
+
+24
+00:01:17,059 --> 00:01:18,604
+non dimostra danni fisici.
+
+25
+00:01:20,897 --> 00:01:23,447
+Per chi gestisce un impianto, la domanda
+
+26
+00:01:23,458 --> 00:01:27,383
+è: dove intervenire prima? Ai controlli programmati,
+
+27
+00:01:27,596 --> 00:01:29,885
+Solar Echo AI affianca segnali per dare
+
+28
+00:01:29,897 --> 00:01:34,213
+priorità alle ispezioni. L’obiettivo: meno controlli inutili,
+
+29
+00:01:34,344 --> 00:01:37,451
+interventi più mirati e costi potenzialmente ridotti.
+
+30
+00:01:38,293 --> 00:01:40,167
+Benefici da validare sul campo.
+
+31
+00:01:42,591 --> 00:01:46,668
+Firma vibrazionale e AI locale. Manutenzione intelligente.
+
+32
+00:01:47,446 --> 00:01:50,403
+Prossimo passo: validazione su alterazioni fisiche.
+
+33
+00:01:52,693 --> 00:01:55,792
+Solar Echo AI. Il pannello che riconosce
+
+34
+00:01:55,804 --> 00:01:56,679
+i propri danni.

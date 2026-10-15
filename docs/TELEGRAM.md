@@ -6,9 +6,9 @@ quando premi **Invia segnalazione**; un'allerta o il LED non inviano messaggi da
 
 ## Prima configurazione, passo per passo
 
-1. Se non l'hai ancora fatto, rigenera con BotFather il token che hai condiviso
-   in chat: usa `/revoke` e seleziona il bot. Conserva il nuovo token solo nelle
-   impostazioni del brick sulla scheda.
+1. Crea un bot con BotFather e conserva il token solo nelle impostazioni del
+   brick sulla scheda. Se un token è stato esposto, revocalo con `/revoke`
+   in BotFather e usa quello nuovo.
 2. Dal repository sul PC esegui il normale deploy:
 
    ```powershell
@@ -51,8 +51,9 @@ Internet. Non serve esporre la dashboard su Internet né aprire porte del router
 - Accelerazione X/Y/Z, che include la gravità.
 - Riferimento elettrico e calo recente, se disponibili.
 - Motivo e valori dell'allerta registrata, se presente.
-- Stato dell'AI: attualmente **non attiva**. Lo score appare solo per un'allerta
-  AI reale passata al sistema, quando il modello sarà integrato.
+- Stato dell'AI: disponibilità dell'inferenza locale sperimentale. Quando
+  presenti, il messaggio include gli ultimi score reali e sintetici, con evento,
+  data e soglia; un'allerta `AI_TEST` è indicata come test artificiale.
 - Scenario economico, se disponibile, esplicitamente **IPOTETICO**.
 - Richiamo all'ispezione, senza diagnosi certa di danni o microfratture.
 
@@ -139,7 +140,8 @@ Prima della demo verifica:
    automatico delle richieste precedenti.
 
 I test software in `tests/test_telegram_notifications.py` usano un bot fittizio,
-senza rete o dati sperimentali. Sono stati preparati, **non eseguiti**:
+senza rete o dati sperimentali. Nella verifica locale del 15 ottobre 2026 sono
+passati **9 test su 9**; questo non verifica il collegamento alla scheda:
 
 ```powershell
 python -m unittest discover -s tests -p test_telegram_notifications.py

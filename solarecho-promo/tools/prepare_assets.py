@@ -26,7 +26,6 @@ def signals():
             'axes': axes, 'samples': len(rows)}
     (ROOT / 'src/data').mkdir(exist_ok=True)
     (ROOT / 'src/data/signal.json').write_text(json.dumps(data), encoding='utf-8')
-    shutil.copy2(REPO / 'risultato_training1.png', PUBLIC / 'training-original.png')
     im = Image.open(REPO / 'risultato_training1.png')
     im.crop((12, 235, 728, 746)).save(PUBLIC / 'training-plot.png')
     shutil.copy2('C:/Windows/Fonts/bahnschrift.ttf', PUBLIC / 'bahnschrift.ttf')

@@ -45,7 +45,7 @@ UNO Q D7 ── resistenza 1 kohm ── anodo LED rosso
 
 D7 corrisponde a PB2 sull'header digitale secondo il
 [manuale ufficiale Arduino](https://docs.arduino.cc/resources/datasheets/ABX00162-ABX00173-datasheet.pdf)
-e il [manuale locale](UM.md). Il dimensionamento a bassa corrente e coerente
+e il [riferimento al manuale Arduino](UM.md). Il dimensionamento a bassa corrente e coerente
 con le caratteristiche GPIO del
 [datasheet STM32U585, sezione caratteristiche di uscita](https://www.st.com/resource/en/datasheet/stm32u585ai.pdf).
 

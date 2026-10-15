@@ -275,14 +275,14 @@ Dalla radice del repository:
 python -B -m unittest discover -s tests -v
 ```
 
-**Verifica locale dell’11 ottobre 2026, Python 3.11.9:** 35 test eseguiti, **27 superati, 7 errori e 1 fallimento**.
+**Verifica locale del 15 ottobre 2026, Python 3.11:** 35 test eseguiti, **28 superati e 7 errori**.
 
 | Gruppo | Esito osservato |
 | --- | --- |
 | Export Edge Impulse | 8/8 superati |
 | Demo elettrica | 5/5 superati |
 | Allerta di ispezione | 6/6 superati |
-| Telegram | 8/9 superati; un test cerca `AI: non attiva`, il formatter restituisce `AI: non pronta` |
+| Telegram | 9/9 superati; aspettativa sullo stato AI aggiornata al formatter corrente |
 | Logger eventi | 7 errori: i mock Arduino non coprono l’importazione di `arduino.app_bricks.web_ui` introdotta dalla dashboard |
 
 Gli esempi di export sopra sono stati eseguiti in cartelle temporanee: 18 eventi di training e 5 di test esportati senza esclusioni, poi 5 copie sintetiche stress generate con verifica dell’integrità degli originali.
@@ -291,7 +291,7 @@ La suite completa richiede quindi un aggiornamento dei test. Questa verifica usa
 
 ## Video e materiali di presentazione
 
-Il progetto [solarecho-promo](solarecho-promo/README.md) contiene un video in italiano di **45 secondi**, realizzato con **Remotion 4.0.534**, con master **1920 × 1080 a 30 fps** e audio originale.
+Il progetto [solarecho-promo](solarecho-promo/README.md) contiene il promo storico di **45 secondi** e il [video hackathon di 118 secondi](video_output/README.md), realizzati con **Remotion 4.0.534**, con master **1920 × 1080 a 30 fps** e audio originale.
 
 Gli output sono nella cartella locale `solarecho-promo/out/`, esclusa da Git; in un nuovo clone i video vanno generati con gli script di rendering.
 

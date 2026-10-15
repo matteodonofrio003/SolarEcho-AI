@@ -16,15 +16,35 @@ htmlcov/
 .venv/
 venv/
 ENV/
+.venv-video/
 
 # Dati creati durante l'esecuzione dell'app sull'UNO Q
 app/data/
 
 # File temporanei e output locali
 tmp/
-video_output/
 *.tmp
 *.temp
+
+# Video: conserva script e documentazione; ignora render e intermedi
+/video_output/*
+!/video_output/README.md
+!/video_output/analisi_materiali.md
+!/video_output/sceneggiatura.md
+!/video_output/storyboard.md
+!/video_output/narrazione.json
+!/video_output/sottotitoli_it.srt
+!/video_output/tools/
+/video_output/tools/*
+!/video_output/tools/*.py
+!/video_output/tools/requirements.txt
+!/video_output/analisi/
+/video_output/analisi/*
+!/video_output/analisi/basic-captions-reference.md
+!/video_output/analisi/*.json
+!/video_output/analisi/impatti/
+/video_output/analisi/impatti/*
+!/video_output/analisi/impatti/contatto-pts.json
 
 # Progetto Remotion: dipendenze e render rigenerabili
 solarecho-promo/node_modules/

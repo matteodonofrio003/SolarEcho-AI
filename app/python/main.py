@@ -1,5 +1,4 @@
 """Cattura per impatto: pretrigger IMU, CSV e controllo della qualita' locale."""
-"""prova ciao"""
 from arduino.app_utils import App, Bridge
 from dashboard import Dashboard
 from power_history import PowerHistory

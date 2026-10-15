@@ -96,7 +96,7 @@ class TelegramNotificationTests(unittest.TestCase):
             "inspection": {"ai_enabled": False}})
         self.assertIn("Impatti totali: n/d", message)
         self.assertIn("Misure elettriche: non disponibili", message)
-        self.assertIn("AI: non attiva", message)
+        self.assertIn("AI: non pronta", message)
         self.assertNotIn("Potenza: 0", message)
 
     def test_private_chat_id_validation_rejects_groups_and_booleans(self):

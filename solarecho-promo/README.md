@@ -1,9 +1,27 @@
 # SolarEcho AI — Ascolta l'energia
 
-Video promozionale in italiano di **45 secondi**, realizzato con Remotion 4.0.534.
+Progetto Remotion 4.0.534 con due montaggi in italiano: il promo storico di
+**45 secondi** e il video hackathon di **118 secondi**.
 Master: **1920 × 1080, 30 fps, H.264, MP4, YUV420p, BT.709**, audio AAC stereo.
 
-## File
+## Video hackathon — 118 secondi
+
+Composizione `SolarEcho-Hackathon`, 3.540 fotogrammi, sorgenti in `src/hackathon/`
+e asset in `public/hackathon/`. Dalla cartella di questo progetto:
+
+```powershell
+npm run preview:hackathon
+npm run render:hackathon
+```
+
+Le consegne sono `../video_output/SolarEcho_AI_anteprima.mp4` e
+`../video_output/SolarEcho_AI_finale.mp4`. La [guida hackathon](../video_output/README.md)
+descrive rigenerazione, narrazione, sottotitoli e verifiche.
+
+Il montaggio mostra l'integrazione AI locale sperimentale; lo stato corrente
+dell'app è descritto in [Integrazione AI](../docs/AI_INTEGRAZIONE.md).
+
+## File del promo storico — 45 secondi
 
 - `out/SolarEcho-AI-promo-1080p.mp4`: video finale.
 - `out/SolarEcho-AI-anteprima-720p.mp4`: anteprima completa 1280 × 720 con audio.
@@ -57,8 +75,10 @@ Tutti gli asset sono locali.
   Anche `test.png` è stato esaminato; le metriche non sono usate come promessa di prestazioni.
 - Font Bahnschrift e Segoe UI dell'installazione locale Windows.
 
-I testi conservano lo stato documentato: **prototipo sperimentale, AI non attiva,
-modello in sviluppo**. Il video non presenta i grafici come diagnosi di danni.
+I testi del promo storico conservano lo stato al momento della sua creazione:
+**prototipo sperimentale, AI non attiva, modello in sviluppo**. Questa descrizione
+non rappresenta lo stato corrente dell'app. Il video non presenta i grafici come
+diagnosi di danni.
 
 ## Musica originale
 
