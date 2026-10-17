@@ -1,5 +1,0 @@
-# Dipendenze degli strumenti video; installare in un ambiente virtuale.
-numpy
-Pillow
-matplotlib
-edge-tts==7.2.8
