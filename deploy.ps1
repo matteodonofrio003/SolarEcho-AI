@@ -30,6 +30,7 @@ $files = @(
     'python/inspection_alert.py',
     'python/telegram_notifications.py',
     'python/vibration_ai.py',
+    'python/event_logger.py', 'python/signal_processing.py',
     'assets/index.html', 'assets/style.css', 'assets/dashboard.js'
 )
 

@@ -15,6 +15,25 @@
 
 ---
 
+## English overview
+
+**SolarEcho AI explores condition monitoring for photovoltaic panels, helping
+plant operators and maintenance technicians identify changes worth inspecting.**
+A piezo sensor triggers each capture; a Modulino Movement records XYZ
+acceleration. Arduino UNO Q handles acquisition on its microcontroller and
+runs anomaly inference locally on Linux. A web dashboard combines vibration
+records with INA219 electrical measurements and supports manual Telegram reports.
+
+The recorded demo shows controlled ball impacts, captured waveforms, local AI
+scores, a visible alert and a manually sent report. A clearly labelled synthetic
+stress test demonstrates the software response to an altered signal. Detecting
+real mechanical changes reliably remains to be validated; anomaly scores do
+not establish damage or microcracks. Inference can operate offline once the
+required model and dependencies are installed; Telegram requires Internet access.
+
+[Demo and evidence](docs/DEMO_E_RISULTATI.md) · [Model card](docs/MODEL_CARD.md) ·
+[Hardware schematic](docs/hardware/design/SolarEcho-AI-schematic_schem.jpg)
+
 ## Il progetto
 
 **SolarEcho AI** studia la risposta meccanica di un pannello fotovoltaico dopo impatti controllati. Il piezo rileva il trigger, l’IMU registra le accelerazioni sui tre assi e l’UNO Q conserva i dati per confrontare la firma vibrazionale con una baseline normale. Un INA219 affianca le acquisizioni con misure di tensione, corrente e potenza.
@@ -35,7 +54,13 @@ Il repository contiene il firmware, l’applicazione Python per Arduino App Lab,
 | Telegram | Anteprima, invio manuale e report persistenti | Integrazione provata dal team; aggiunta dei dati AI da verificare |
 | Esportazione | CSV uniformi per Edge Impulse e report delle esclusioni | Lotti esportati presenti; test del convertitore superati nella verifica locale descritta sotto |
 
-Le guide in `docs/` registrano anche fasi precedenti dello sviluppo. Per il contratto AI corrente consultare [l’integrazione AI](docs/AI_INTEGRAZIONE.md), il manifest e il codice; alcuni testi più vecchi e il video descrivono ancora il modello come non attivo.
+Le guide in `docs/` registrano anche fasi precedenti dello sviluppo. La
+[pagina Demo e risultati](docs/DEMO_E_RISULTATI.md) distingue le evidenze raccolte
+dalle validazioni ancora aperte; la [scheda del modello](docs/MODEL_CARD.md)
+riassume dati, input e limiti. Per l'avvio consultare
+[l’integrazione AI](docs/AI_INTEGRAZIONE.md). Il promo storico di 45 secondi
+descrive ancora il modello come non attivo; i montaggi successivi mostrano
+l'integrazione sperimentale.
 
 ## Come funziona
 
@@ -73,11 +98,11 @@ La telemetria web è un’anteprima, pubblicata al massimo a **1 Hz** quando il 
 | **LED rosso esterno** | D7 → resistenza 1 kΩ → anodo; catodo → GND |
 | **LED RGB 3 integrato** | Il canale rosso replica l’allerta |
 
-**Prima dei collegamenti**, seguire [la guida piezo](docs/SERIALE_PIEZO.md) e [la guida INA219](docs/INA219_SERIALE.md). Una sola resistenza da 1 MΩ in parallelo al piezo non protegge l’ADC. Il modulo Grove Piezo elencato nell’inventario ha un’uscita HIGH/LOW: non va confuso con un elemento piezo analogico grezzo.
+**Prima dei collegamenti**, seguire [la guida piezo](docs/ACQUISIZIONE_E_SENSORI.md#piezo-analogico-e-protezione) e [la guida INA219](docs/ACQUISIZIONE_E_SENSORI.md#ina219-e-misura-elettrica). Una sola resistenza da 1 MΩ in parallelo al piezo non protegge l’ADC. Il modulo Grove Piezo elencato nell’inventario ha un’uscita HIGH/LOW: non va confuso con un elemento piezo analogico grezzo.
 
 OLED, sensore ACS70331, batteria e caricatore solare sono documentati nell’inventario, ma non costituiscono il percorso di acquisizione implementato in questo firmware. Modelli fisici, alimentazione e cablaggio vanno confermati seguendo [Componenti](docs/COMPONENTI.md).
 
-Materiali disponibili: [schema Fritzing](docs/SolarEcho-AI-schematic.fzz), [vista breadboard](docs/SolarEcho-AI-schematic_bb.jpg), [schema elettrico](docs/SolarEcho-AI-schematic_schem.jpg), [distinta elettronica](docs/SolarEcho-AI-eBOM.xlsx) e [involucro STL](Solar_Housing.stl). Per i pin dell’UNO Q usare il [pinout dedicato](docs/ABX00162-full-pinout.pdf).
+Materiali disponibili: [schema Fritzing](docs/hardware/design/SolarEcho-AI-schematic.fzz), [vista breadboard](docs/hardware/design/SolarEcho-AI-schematic_bb.jpg), [schema elettrico](docs/hardware/design/SolarEcho-AI-schematic_schem.jpg), [distinta elettronica](docs/hardware/design/SolarEcho-AI-eBOM.xlsx) e [involucro STL](Solar_Housing.stl). Per i pin dell’UNO Q usare il [pinout dedicato](docs/hardware/datasheets/ABX00162-full-pinout.pdf).
 
 ## Avvio rapido
 
@@ -139,7 +164,7 @@ L’opzione `-Start` trasferisce e avvia anche l’app, ma richiede che le altre
 
 Fissa sensore, posizione e orientamento; mantieni ripetibili pallina, altezza e punto di caduta. Attendi **READY**, esegui un solo impatto, poi aspetta il salvataggio e il successivo READY. Controlla `capture_complete=True` nel JSON e osserva il grafico prima di usare l’evento come baseline.
 
-La procedura completa è in [Prima acquisizione](docs/PRIMA_ACQUISIZIONE.md). Gli strumenti di export sul PC richiedono **Python 3.9+**, con la sola libreria standard.
+La procedura completa è in [Prima acquisizione](docs/ACQUISIZIONE_E_SENSORI.md#prima-acquisizione). Gli strumenti di export sul PC richiedono **Python 3.9+**, con la sola libreria standard.
 
 ## Dashboard
 
@@ -154,7 +179,7 @@ L’energia viene integrata soltanto sugli intervalli coperti da misure valide; 
 
 L’allerta rimane memorizzata fino a **Conferma / reset allerta**. Il test sintetico usa il motivo `AI_TEST`; un’anomalia reale usa `AI_ANOMALY`. LED e allerte non inviano automaticamente Telegram: l’invio parte dal pulsante **Invia segnalazione**.
 
-Per Telegram, avvia la chat privata con `/start`, copia il **Chat ID** ricevuto nella dashboard e salva il destinatario. Il Chat ID è distinto dal token. Guide: [Dashboard](docs/DASHBOARD.md), [Energia e costi](docs/DEMO_ECONOMICA.md), [LED](docs/LED_ISPEZIONE.md), [Telegram](docs/TELEGRAM.md).
+Per Telegram, avvia la chat privata con `/start`, copia il **Chat ID** ricevuto nella dashboard e salva il destinatario. Il Chat ID è distinto dal token. Guide: [Dashboard](docs/DASHBOARD.md), [Energia e costi](docs/DEMO_ECONOMICA.md), [LED](docs/DASHBOARD.md#allerte-e-led), [Telegram](docs/TELEGRAM.md).
 
 ## Dataset e AI
 
@@ -164,10 +189,10 @@ Per Telegram, avvia la chat privata con `/start`, copia il **Chat ID** ricevuto 
 | --- | --- | --- |
 | Acquisizione grezza | IMU nominale ~104 Hz; frequenza effettiva nei metadati | −200 ms / +2000 ms |
 | Inferenza AI corrente | **100 Hz · 200 campioni XYZ · 600 valori in g** | **[−150, +1850) ms** |
-| Export predefinito del convertitore | 100 Hz · 210 campioni XYZ | [−150, +1950) ms |
+| Export predefinito del convertitore | **100 Hz · 200 campioni XYZ · 600 valori in g** | **[−150, +1850) ms** |
 | Lotti demo già presenti | 100 Hz · 200 campioni XYZ | [−150, +1850) ms |
 
-**Le due finestre di export non sono intercambiabili.** Per produrre input coerenti con l’integrazione AI corrente specificare `--end-ms 1850`. Il ricampionamento è lineare, senza estrapolazione, sottrazione dell’offset o normalizzazione dell’ampiezza; non è un filtro antialias.
+**Export e inferenza condividono configurazione, controlli di qualità e ricampionamento** in [signal_processing.py](app/python/signal_processing.py). Il valore predefinito è già coerente con il modello corrente: non serve specificare `--end-ms 1850`. I lotti storici da 210 campioni restano invariati e la loro finestra si riproduce specificando `--end-ms 1950`. Il ricampionamento è lineare, senza estrapolazione, sottrazione dell’offset o normalizzazione dell’ampiezza; non è un filtro antialias.
 
 Lo score di anomalia non è una percentuale né una probabilità e può essere negativo. Il confronto implementato è `score >= soglia`. La soglia della dashboard deve essere aggiornata manualmente se cambia quella nello Studio.
 
@@ -177,10 +202,10 @@ Copia dal dispositivo **CSV e JSON insieme**, poi separa eventi normali, modific
 
 ```powershell
 # Training normale, con la finestra del modello corrente.
-python tools/export_edge_impulse.py --input datasets/raw/demo_normal_training --output datasets/edge_impulse/readme_training_v1 --label normal --split training --end-ms 1850
+python tools/export_edge_impulse.py --input datasets/raw/demo_normal_training --output datasets/edge_impulse/readme_training_v1 --label normal --split training
 
 # Eventi normali separati per il test.
-python tools/export_edge_impulse.py --input datasets/raw/demo_normal_test --output datasets/edge_impulse/readme_test_v1 --label normal --split test --end-ms 1850
+python tools/export_edge_impulse.py --input datasets/raw/demo_normal_test --output datasets/edge_impulse/readme_test_v1 --label normal --split test
 
 # Copie sintetiche del lotto di test, in una nuova cartella.
 python tools/generate_synthetic_impacts.py --input datasets/edge_impulse/readme_test_v1 --output datasets/edge_impulse/readme_synthetic_v1 --profile stress
@@ -208,7 +233,7 @@ Conteggi ricavati dai report presenti nel repository, alla verifica dell’11 ot
 
 I conteggi descrivono i dati, non l’accuratezza del modello. Le copie sintetiche sono correlate ai loro originali e non valgono come impatti fisici indipendenti. Il profilo `stress` aggiunge oscillazioni di 0,35 g a 8/17/29 Hz su X/Y/Z dopo il trigger, con rampa di 50 ms; non simula un danno fisico validato.
 
-Guide: [Export Edge Impulse](docs/EDGE_IMPULSE_EXPORT.md), [Integrazione AI](docs/AI_INTEGRAZIONE.md), [Test sintetici](docs/TEST_SINTETICO.md), [Verifica delle condizioni reali](docs/VERIFICA_TEST_20261010.md).
+Guide: [Export Edge Impulse](docs/EDGE_IMPULSE_EXPORT.md), [Integrazione AI](docs/AI_INTEGRAZIONE.md), [Test sintetici](docs/AI_INTEGRAZIONE.md#test-sintetici-offline), [Verifica delle condizioni reali](docs/archive/tests/VERIFICA_TEST_20261010.md).
 
 ## Struttura del repository
 
@@ -222,24 +247,34 @@ SolarEcho-AI/
 ├── datasets/
 │   ├── raw/                     # Acquisizioni originali CSV + JSON
 │   ├── edge_impulse/            # Lotti esportati, sintetici e report
+│   ├── manifests/               # Provenienza e report storici degli split
 │   └── rejected/               # Archivi di acquisizioni scartate
-├── docs/                        # Guide, specifiche, datasheet e schemi
+├── docs/                        # Guide operative e specifica SRS
+│   ├── hardware/                # Manuale, datasheet e progettazione
+│   └── archive/                 # Verifiche datate e manifest del riordino
 ├── tests/                       # Test Python con dati e servizi simulati
 ├── tools/                       # Export e generatore di perturbazioni
-├── solarecho-promo/              # Sorgenti e output del video Remotion
-├── materiale_per_video/         # Registrazione video di supporto
+├── presentation/              # Tutti i sorgenti e i materiali video
+│   ├── materials/               # Foto e riprese originali del team
+│   ├── docs/                    # Guida al video corrente e archivio
+│   └── tools/                   # Preparazione risorse e verifiche video
+├── video_output/                # Render e intermedi locali, esclusi da Git
 ├── Solar_Housing.stl             # Involucro CAD
-├── risultato_training1.png      # Immagine del training
-├── test.png                     # Immagine di test
 └── deploy.ps1                   # Trasferimento USB/ADB oppure SSH/SCP
 ```
+
+Indici: [documentazione](docs/README.md), [dataset e provenienza](datasets/README.md),
+[materiali video](presentation/README.md). I vecchi percorsi e le copie
+deduplicate sono documentati nel [manifest del riordino](docs/archive/REPOSITORY_CLEANUP_20261017.json).
 
 <details>
 <summary><strong>Moduli Python principali</strong></summary>
 
 | Modulo | Responsabilità |
 | --- | --- |
-| [main.py](app/python/main.py) | Callback Bridge, controllo qualità, salvataggio e riarmo |
+| [main.py](app/python/main.py) | Avvio App Lab, callback Bridge e collegamento dei servizi |
+| [event_logger.py](app/python/event_logger.py) | Protocollo eventi, timeout, qualità, salvataggio e ACK senza dipendenze Arduino |
+| [signal_processing.py](app/python/signal_processing.py) | Configurazione e preprocessing condivisi da export e inferenza |
 | [dashboard.py](app/python/dashboard.py) | Web UI, telemetria e API HTTP |
 | [power_history.py](app/python/power_history.py) | Storico elettrico per sessione |
 | [vibration_ai.py](app/python/vibration_ai.py) | Preparazione input, worker del modello e report |
@@ -275,7 +310,7 @@ Dalla radice del repository:
 python -B -m unittest discover -s tests -v
 ```
 
-**Verifica locale del 15 ottobre 2026, Python 3.11:** 35 test eseguiti, **28 superati e 7 errori**.
+**Esecuzione storica del 15 ottobre 2026, Python 3.11 (prima del refactoring):** 35 test eseguiti, **28 superati e 7 errori**. I conteggi seguenti non descrivono la suite aggiornata.
 
 | Gruppo | Esito osservato |
 | --- | --- |
@@ -287,30 +322,58 @@ python -B -m unittest discover -s tests -v
 
 Gli esempi di export sopra sono stati eseguiti in cartelle temporanee: 18 eventi di training e 5 di test esportati senza esclusioni, poi 5 copie sintetiche stress generate con verifica dell’integrità degli originali.
 
-La suite completa richiede quindi un aggiornamento dei test. Questa verifica usa dati e servizi simulati; non esegue il modello, non invia messaggi Telegram e non verifica l’hardware. Compilazione del firmware, deploy e prova fisica non sono stati ripetuti durante questa analisi.
+**Aggiornamento del 17 ottobre 2026:** il logger è stato estratto in un modulo
+indipendente da App Lab e i suoi test non importano più `main.py` né richiedono
+mock dei brick Arduino. Sono stati aggiunti controlli sull'ordine salvataggio/ACK
+e sull'ACK rifiutato. I test dell'export verificano anche l'identità esatta dei
+600 valori XYZ rispetto al preprocessing dell'inferenza, i valori predefiniti
+della CLI e l'override esplicito della finestra storica.
+
+**I test aggiornati non sono stati eseguiti dall'assistente:** il team li esegue
+con il comando sopra. Usano file temporanei e segnali sintetici; non avviano
+il modello o App Lab, non inviano Telegram e non verificano l'hardware.
+
+Dopo la verifica software: eseguire il deploy completo, riconfigurare Telegram
+e premere Run. Controllare un impatto: CSV/JSON salvati, ritorno a READY ed esito
+AI; verificare anche il test sintetico dalla dashboard. Annotare separatamente
+l'esito della prova fisica e quello dei test software.
 
 ## Video e materiali di presentazione
 
-Il progetto [solarecho-promo](solarecho-promo/README.md) contiene il promo storico di **45 secondi** e il [video hackathon di 118 secondi](video_output/README.md), realizzati con **Remotion 4.0.534**, con master **1920 × 1080 a 30 fps** e audio originale.
+Il progetto [presentation](presentation/README.md) raccoglie sorgenti,
+materiali e istruzioni Remotion. La versione corrente è il [montaggio di 108 secondi](presentation/docs/SHOWCASE.md),
+con riprese reali, musica originale e testi, senza voce. Master **1920 × 1080 a 30 fps**.
+La sorgente include circa 30 secondi di esplorazione dei nove componenti del prototipo;
+questa revisione v4 è esportata in MP4 e verificata.
+I sorgenti attivi riguardano soltanto il montaggio corrente. Gli MP4 storici
+restano conservati localmente; le evidenze del video hackathon sono in archivio.
 
-Gli output sono nella cartella locale `solarecho-promo/out/`, esclusa da Git; in un nuovo clone i video vanno generati con gli script di rendering.
+I render locali sono esclusi da Git. In un nuovo clone si generano con gli
+script nella [guida video](presentation/README.md).
 
 | File locale | Contenuto |
 | --- | --- |
-| `out/SolarEcho-AI-promo-1080p.mp4` | Video finale 1080p |
-| `out/SolarEcho-AI-anteprima-720p.mp4` | Anteprima 720p |
-| `out/storyboard.jpg` | Riepilogo delle scene |
-| `out/verification.json` | Report tecnico del video |
+| `video_output/SolarEcho_AI_showcase_componenti_v4.mp4` | Video corrente, nove componenti animati, 108 secondi |
+| `video_output/SolarEcho_AI_showcase_esploso_v3.mp4` | Versione precedente, esploso illustrativo, 90 secondi |
+| `video_output/SolarEcho_AI_showcase_v2.mp4` | Versione precedente all'esploso, 90 secondi |
+| `video_output/SolarEcho_AI_finale.mp4` | Consegna originale, 118 secondi |
+| `presentation/out/SolarEcho-AI-promo-1080p.mp4` | Promo storico, 45 secondi |
+| `presentation/docs/showcase/verifica_export.json` | Verifica tecnica dell'MP4 v2 |
+| `presentation/docs/showcase/verifica_export_esploso_v3.json` | Verifica tecnica dell'MP4 v3 |
+| `presentation/docs/showcase/verifica_export_componenti_v4.json` | Verifica tecnica dell'MP4 v4 |
 
 Per aprire lo Studio, con Node.js e npm disponibili:
 
 ```powershell
-cd solarecho-promo
+cd presentation
 npm ci
 npm run dev
 ```
 
-Gli script `npm run preview`, `npm run render` e `npm run lint` generano le versioni video e verificano le sorgenti. La dashboard del video è una ricostruzione grafica; i testi conservano lo stato del progetto al momento della produzione e precedono l’integrazione AI corrente.
+Selezionare `SolarEcho-Showcase-108` per il video corrente. Il comando
+`npm run render:showcase` lo esporta in MP4. Le dashboard dei due montaggi più
+recenti provengono da registrazioni reali; il promo storico di 45 secondi usa
+anche una ricostruzione grafica e conserva lo stato del progetto dell'epoca.
 
 ## Documentazione
 
@@ -318,17 +381,19 @@ Gli script `npm run preview`, `npm run render` e `npm run lint` generano le vers
 | --- | --- |
 | Obiettivi, requisiti e limiti | [Specifica SRS](docs/SRS.md) |
 | Componenti e fonti tecniche | [Inventario e documentazione](docs/COMPONENTI.md) |
-| Scheda e pin | [Manuale UNO Q](docs/UM.md) · [Pinout](docs/ABX00162-full-pinout.pdf) |
-| Cablaggio e prima prova | [Piezo/seriale](docs/SERIALE_PIEZO.md) · [Prima acquisizione](docs/PRIMA_ACQUISIZIONE.md) · [INA219](docs/INA219_SERIALE.md) |
+| Scheda e pin | [Manuale UNO Q](https://docs.arduino.cc/tutorials/uno-q/user-manual/) · [Pinout](docs/hardware/datasheets/ABX00162-full-pinout.pdf) |
+| Cablaggio e prima prova | [Acquisizione e sensori](docs/ACQUISIZIONE_E_SENSORI.md) |
 | Trasferimento e avvio | [Deploy](docs/DEPLOY.md) |
 | Uso dell’interfaccia | [Dashboard](docs/DASHBOARD.md) |
 | Preparazione dei dati | [Export Edge Impulse](docs/EDGE_IMPULSE_EXPORT.md) |
+| Evidenze e limiti della demo | [Demo e risultati](docs/DEMO_E_RISULTATI.md) |
+| Identità, dati e limiti del modello | [Scheda del modello AI](docs/MODEL_CARD.md) |
 | Modello, soglia e inferenza | [Integrazione AI](docs/AI_INTEGRAZIONE.md) |
-| Perturbazioni software | [Test sintetici](docs/TEST_SINTETICO.md) |
-| Prove normali/modificate/ripristinate | [Verifica del 10 ottobre 2026](docs/VERIFICA_TEST_20261010.md) |
+| Perturbazioni software | [Test sintetici](docs/AI_INTEGRAZIONE.md#test-sintetici-offline) |
+| Prove normali/modificate/ripristinate | [Verifica del 10 ottobre 2026](docs/archive/tests/VERIFICA_TEST_20261010.md) |
 | Energia e proiezioni | [Demo economica](docs/DEMO_ECONOMICA.md) |
-| Segnalazione di ispezione | [LED e soglie](docs/LED_ISPEZIONE.md) · [Telegram](docs/TELEGRAM.md) |
-| Presentazione | [Progetto video](solarecho-promo/README.md) |
+| Segnalazione di ispezione | [LED e soglie](docs/DASHBOARD.md#allerte-e-led) · [Telegram](docs/TELEGRAM.md) |
+| Presentazione | [Progetto video](presentation/README.md) |
 
 ## Problemi comuni
 

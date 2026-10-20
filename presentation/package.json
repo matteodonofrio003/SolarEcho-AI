@@ -1,0 +1,35 @@
+{
+  "name": "solarecho-presentation",
+  "version": "1.0.0",
+  "description": "SolarEcho AI - presentazione di 108 secondi, musica e testi senza voce",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.534",
+    "@remotion/fonts": "4.0.534",
+    "@remotion/media": "4.0.534",
+    "@remotion/transitions": "4.0.534",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.534",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.39.5",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio --no-open",
+    "preview": "remotion render src/index.ts SolarEcho-Showcase-108 ../video_output/SolarEcho_AI_showcase_componenti_v4_anteprima.mp4 --codec=h264 --scale=0.6666666666666666 --crf=25 --audio-bitrate=192k --pixel-format=yuv420p --color-space=bt709 --concurrency=3",
+    "render": "remotion render src/index.ts SolarEcho-Showcase-108 ../video_output/SolarEcho_AI_showcase_componenti_v4.mp4 --codec=h264 --crf=18 --audio-bitrate=256k --pixel-format=yuv420p --color-space=bt709 --concurrency=3",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "render:showcase": "npm run render",
+    "qa:showcase": "node tools/qa-showcase.cjs"
+  }
+}

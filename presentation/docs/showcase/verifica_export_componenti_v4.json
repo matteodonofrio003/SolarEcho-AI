@@ -1,0 +1,40 @@
+{
+  "file": "SolarEcho_AI_showcase_componenti_v4.mp4",
+  "verified_at": "2026-10-17T17:24:37",
+  "composition": "SolarEcho-Showcase-108",
+  "video": {
+    "codec_name": "h264",
+    "width": 1920,
+    "height": 1080,
+    "pix_fmt": "yuv420p",
+    "r_frame_rate": "30/1",
+    "duration": "108.000000",
+    "nb_frames": "3240",
+    "color_space": "bt709"
+  },
+  "audio": {
+    "codec_name": "aac",
+    "sample_rate": "48000",
+    "channels": 2,
+    "duration": "108.011000",
+    "bit_rate": "253374"
+  },
+  "container_duration": "108.011000",
+  "size_bytes": 37368790,
+  "sha256": "f0893d34c13f5ebfcd4f8108928f5e554e974ace6ff6f3723b4cdf32ad3680f8",
+  "full_decode": "passed",
+  "voiceover": false,
+  "music": "Original instrumental extended to 108 seconds, 120 BPM",
+  "illustration_provenance": "presentation/public/exploded/components-atlas-v4.provenance.json",
+  "encoded_frames_extracted_s": [
+    20,
+    28,
+    39,
+    43,
+    92,
+    105
+  ],
+  "visual_review": "Passed: encoded MP4 frames at 20, 28, 39, 43, 92 and 105 seconds inspected. Component labels, illustrative notice and final scenes are readable, with no unwanted atlas fragments.",
+  "previous_v3_sha256": "9cee91cb5be0c0d5a9ac384cfafa37b2f2b79e9e594e8ba888cf69dbe5a7301b",
+  "previous_v3_unchanged": true
+}

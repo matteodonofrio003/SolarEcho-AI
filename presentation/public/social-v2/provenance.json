@@ -1,0 +1,56 @@
+{
+  "voiceover": false,
+  "music": "Original procedural instrumental, 120 BPM; no third-party samples",
+  "physical_demo": "VID20261011150931.mp4, source contact about 7.58 s",
+  "phone": "VID20261011151045.mp4",
+  "dashboard": "Registrazione 2026-10-11 151111.mp4",
+  "screenshots_at_seconds": {
+    "acquisition": 22,
+    "inference": 24,
+    "synthetic": 29,
+    "alert": 44,
+    "telegram": 76
+  },
+  "crops_xyxy": {
+    "waveform": [
+      160,
+      340,
+      1680,
+      815
+    ],
+    "real-score": [
+      188,
+      790,
+      537,
+      910
+    ],
+    "synthetic-plot": [
+      160,
+      380,
+      1680,
+      893
+    ],
+    "alert": [
+      160,
+      385,
+      1680,
+      610
+    ]
+  },
+  "phone_detail": {
+    "source": "telegram.mp4",
+    "at_seconds": 6,
+    "crop_xyxy": [
+      340,
+      500,
+      700,
+      1220
+    ]
+  },
+  "notes": [
+    "Edited inserts do not establish synchronization between recordings.",
+    "Real score 0.6035 exceeds configured threshold 0.3000; no proof of physical damage.",
+    "Synthetic score 82.1386 is a software stress test, not physical validation.",
+    "Telegram is a manual report, not an automatic dispatch."
+  ]
+}

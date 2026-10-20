@@ -1,0 +1,33 @@
+{
+  "file": "SolarEcho_AI_showcase_v2.mp4",
+  "verified_at": "2026-10-17T10:41:34",
+  "composition": "SolarEcho-Showcase-90",
+  "video": {
+    "codec_name": "h264",
+    "width": 1920,
+    "height": 1080,
+    "pix_fmt": "yuv420p",
+    "r_frame_rate": "30/1",
+    "duration": "90.000000",
+    "nb_frames": "2700",
+    "color_space": "bt709"
+  },
+  "audio": {
+    "codec_name": "aac",
+    "sample_rate": "48000",
+    "channels": 2,
+    "duration": "90.005000",
+    "bit_rate": "253376"
+  },
+  "container_duration": "90.005000",
+  "size_bytes": 33155460,
+  "sha256": "08c3d49828025a3d2d976cd979fc27dfa1f7bb7fac2580709fbf7dc66f82566d",
+  "full_decode": "passed",
+  "voiceover": false,
+  "encoded_frames_extracted_s": [
+    35,
+    74,
+    87
+  ],
+  "visual_review": "Passed: encoded MP4 frames at 35, 74 and 87 seconds inspected."
+}

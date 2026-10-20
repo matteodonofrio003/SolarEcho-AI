@@ -1,0 +1,24 @@
+{
+  "asset": "components-atlas-v4.png",
+  "tool": "built-in image_gen",
+  "prompt": "Create ONE production animation sprite atlas for the real SolarEcho AI prototype, guided by the three provided reference photos. Output a square image with a strict 3 by 3 uniform invisible grid and a genuinely TRANSPARENT background. Each of the 9 cells contains exactly ONE fully isolated photorealistic product illustration, centered entirely within its own cell with 15% clear margin; no overlap between cells, no contact shadows extending outside a cell. Same slightly elevated three-quarter view for all objects, mint rim light, realistic black/teal PCB and metallic textures. NO text, no labels, no numbering, no grid lines, no extra objects. This sheet will be displayed as 9 independently animated sprites, so spacing and isolation are essential. Cell row 1 col 1: the small rectangular blue photovoltaic panel with TWO blue sections separated by one dark horizontal stripe, as in the front photograph, without black support. Row 1 col 2: ONLY the black 3D-printed support frame/plate, with rectangular central opening like the photograph, without panel, electronics, wires or LED. Row 1 col 3: ONLY the Arduino UNO Q teal board, guided by the REAR photo: front Qualcomm module silver wireless shield, USB-C, black pin headers; no battery or extra stacked board, no Raspberry Pi connector cluster. Row 2 col 1: ONLY one analog passive piezo element, a flat round brass disc with a smaller pale ceramic center and two short thin wires; not a commercial digital board. Row 2 col 2: ONLY an Arduino Modulino Movement accelerometer board, small blue rectangular PCB with a central black motion IC and two small white side Qwiic connectors; NO lens, NO white dome, NO PIR sensor, NO optical element. Row 2 col 3: ONLY an INA219 breakout blue rectangular PCB with green two-position screw terminal and large black shunt resistor, guided by the SIDE photo, without the panel. Row 3 col 1: ONLY a compact generic solar charger PCB with small USB connector, black IC and battery connector; illustrate generic module role, do not assert any exact Waveshare revision. Row 3 col 2: ONLY a small silver lithium-polymer pouch battery with yellow tape edge and a short red/black cable and white plug, separate from other boards. Row 3 col 3: ONLY one red through-hole 5mm LED with two legs and a small series resistor alongside it (one functional indicator group), not lit so native video glow can animate it. This is an illustrative atlas, not engineering CAD. Preserve the prototype's recognizable panel and frame. Do not include breadboard, OLED, motors, housing screws or unsupported sensors. High quality realistic product render on true alpha transparency, square aspect ratio.",
+  "final_edit_prompt": "Edit this transparent 3x3 sprite atlas. Preserve all NINE objects and their row/column assignment, their realistic materials, same lighting and alpha background. TWO targeted corrections: (1) Replace ONLY the board in the top right cell with a simplified but recognizable Arduino UNO Q board guided by the provided REAR prototype photo: teal PCB, rectangular silver wireless module near the upper left, small USB-C connector and small push button together near the upper right, black female pin header rows along the edges, central black processor components. There is NO black cylindrical barrel power jack, NO large square USB-B socket, NO UNO R3 visual layout. Preserve three-quarter perspective. Do not duplicate the battery or stacked support PCB on this board. (2) Enforce exact equal 3-by-3 grid with completely isolated sprites: shrink each entire object to fit inside central 76% of its own cell, center each object including its wires within its cell; keep at least 12% transparent margin on all four sides of every cell. Especially the battery's white connector and wires must remain entirely inside bottom middle cell, and the solar panel entirely inside top left cell. Maintain square canvas, nine equal-sized invisible grid cells, no labels, no borders, no added elements. Keep genuinely transparent background and clean alpha edges.",
+  "reference_photos": [
+    "IMG20261011143543.jpg",
+    "IMG20261011143612.jpg",
+    "IMG20261011143550.jpg"
+  ],
+  "notes": [
+    "Illustrative geometry from photographs, not CAD or exact PCB reference.",
+    "Solar charger revision is deliberately generic because physical variant is not confirmed.",
+    "OLED and digital Grove piezo are not part of the current prototype.",
+    "Nine sprites displayed through separate native viewports; source alpha preserved.",
+    "No voice; original instrumental extended to 108 seconds."
+  ],
+  "sha256": "ed8f47e2500f55581841f5ec2036e2b747f5cd6ee66dd6ffd4c11fde2396a0cf",
+  "dimensions": [
+    1254,
+    1254
+  ],
+  "alpha_preserved": true
+}

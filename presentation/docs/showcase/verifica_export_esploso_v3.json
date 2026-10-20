@@ -1,0 +1,39 @@
+{
+  "file": "SolarEcho_AI_showcase_esploso_v3.mp4",
+  "verified_at": "2026-10-17T16:24:59",
+  "composition": "SolarEcho-Showcase-90",
+  "video": {
+    "codec_name": "h264",
+    "width": 1920,
+    "height": 1080,
+    "pix_fmt": "yuv420p",
+    "r_frame_rate": "30/1",
+    "duration": "90.000000",
+    "nb_frames": "2700",
+    "color_space": "bt709"
+  },
+  "audio": {
+    "codec_name": "aac",
+    "sample_rate": "48000",
+    "channels": 2,
+    "duration": "90.005000",
+    "bit_rate": "253376"
+  },
+  "container_duration": "90.005000",
+  "size_bytes": 30395801,
+  "sha256": "9cee91cb5be0c0d5a9ac384cfafa37b2f2b79e9e594e8ba888cf69dbe5a7301b",
+  "full_decode": "passed",
+  "voiceover": false,
+  "music": "Original procedural instrumental, 120 BPM",
+  "illustration_provenance": "presentation/public/exploded/provenance.json",
+  "encoded_frames_extracted_s": [
+    17,
+    24.5,
+    35,
+    74,
+    87
+  ],
+  "visual_review": "Passed: encoded MP4 frames at 24.5, 74 and 87 seconds inspected; readable labels and illustrative-view notice, no overlaps.",
+  "previous_v2_sha256": "08c3d49828025a3d2d976cd979fc27dfa1f7bb7fac2580709fbf7dc66f82566d",
+  "previous_v2_unchanged": true
+}

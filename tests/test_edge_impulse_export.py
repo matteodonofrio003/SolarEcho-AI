@@ -4,8 +4,10 @@ import csv
 import importlib.util
 import io
 import json
+import math
 from pathlib import Path
 import tempfile
+from unittest.mock import patch
 import unittest
 
 
@@ -13,6 +15,7 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / "tools/export_edge_impulse.p
 SPEC = importlib.util.spec_from_file_location("edge_impulse_export", MODULE_PATH)
 exporter = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(exporter)
+from vibration_ai import prepare_capture
 
 
 class EdgeImpulseExportTest(unittest.TestCase):
@@ -63,8 +66,8 @@ class EdgeImpulseExportTest(unittest.TestCase):
             reader = csv.DictReader(stream)
             self.assertEqual(reader.fieldnames, ["timestamp", "accX", "accY", "accZ"])
             rows = list(reader)
-        self.assertEqual(len(rows), 210)
-        self.assertEqual([float(row["timestamp"]) for row in rows], list(range(0, 2100, 10)))
+        self.assertEqual(len(rows), 200)
+        self.assertEqual([float(row["timestamp"]) for row in rows], list(range(0, 2000, 10)))
         for index, row in enumerate(rows):
             relative_s = -0.15 + index / 100
             self.assertAlmostEqual(float(row["accX"]), relative_s)
@@ -72,6 +75,56 @@ class EdgeImpulseExportTest(unittest.TestCase):
             self.assertEqual(float(row["accZ"]), 1.0)  # Nessuna rimozione implicita di gravita.
         self.assertEqual(path.read_bytes(), original_csv)
         self.assertEqual(path.with_suffix(".json").read_bytes(), original_json)
+
+    def test_default_export_matches_model_input_exactly(self):
+        path = self.capture(step_us=9611)
+        # Assi non lineari e valori con molte cifre: verifica anche precisione e ordine XYZ.
+        with path.open(newline="", encoding="utf-8") as stream:
+            reader = csv.DictReader(stream)
+            fields, rows = reader.fieldnames, list(reader)
+        for row in rows:
+            second = int(row["timestamp_us"]) / 1e6
+            for axis, frequency in zip(("ax_g", "ay_g", "az_g"), (7.3, 13.1, 19.7)):
+                row[axis] = repr(math.sin(second * frequency) + 0.123456789123)
+        with path.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(rows)
+        original_csv = path.read_bytes()
+        original_json = path.with_suffix(".json").read_bytes()
+        report = self.export()
+        exported = self.output / report["events"][0]["output_csv"]
+        with exported.open(newline="", encoding="utf-8") as stream:
+            edge_rows = list(csv.DictReader(stream))
+        model_rows, _ = prepare_capture(path)  # Preprocessing soltanto: non avvia il runner.
+        self.assertEqual(len(model_rows), 200)
+        self.assertEqual(report["window_duration_ms"], 2000)
+        self.assertEqual(report["end_relative_trigger_ms_exclusive"], 1850)
+        self.assertEqual([row[0] for row in model_rows], list(range(-150, 1850, 10)))
+        edge_features = [float(row[axis]) for row in edge_rows for axis in ("accX", "accY", "accZ")]
+        model_features = [value for row in model_rows for value in row[1:]]
+        self.assertEqual(len(model_features), 600)
+        self.assertEqual(model_features, edge_features)
+        self.assertEqual([float(row["timestamp"]) - 150 for row in edge_rows],
+                         [row[0] for row in model_rows])
+        self.assertEqual(path.read_bytes(), original_csv)
+        self.assertEqual(path.with_suffix(".json").read_bytes(), original_json)
+
+    def test_cli_defaults_match_current_model(self):
+        argv = [str(MODULE_PATH), "--input", "unused_raw", "--output", "unused_export",
+                "--label", "normal", "--split", "training"]
+        with patch.object(exporter.sys, "argv", argv):
+            with patch.object(exporter, "export_batch", return_value={"excluded": 0}) as export:
+                self.assertEqual(exporter.main(), 0)
+        self.assertEqual(export.call_args.args[5:8], (100, -150, 1850))
+
+    def test_historical_window_requires_explicit_override(self):
+        path = self.capture()
+        report = self.export(end_ms=1950)
+        self.assertEqual(report["events"][0]["exported_samples"], 210)
+        self.assertEqual(report["end_relative_trigger_ms_exclusive"], 1950)
+        model_rows, _ = prepare_capture(path)
+        self.assertEqual(len(model_rows), 200)
 
     def test_incomplete_and_multiple_impacts_excluded(self):
         self.capture("incomplete", capture_complete=False)
@@ -81,6 +134,9 @@ class EdgeImpulseExportTest(unittest.TestCase):
         self.assertEqual(report["exported"], 0)
         self.assertFalse(list((self.output / "training").glob("*.csv")))
         self.assertTrue((self.output / "export_report.json").is_file())
+        for path in self.source.glob("*.csv"):
+            with self.assertRaises(ValueError):
+                prepare_capture(path)
 
     def test_missing_json_is_not_silently_accepted(self):
         path = self.capture()

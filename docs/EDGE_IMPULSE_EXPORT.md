@@ -64,8 +64,16 @@ timestamp,accX,accY,accZ
 
 - `timestamp`: millisecondi da zero, passo uniforme di 10 ms a 100 Hz.
 - `accX/accY/accZ`: accelerazioni in **g**, ordine X/Y/Z.
-- Finestra comune: da **-150 ms a +1950 ms esclusi**, relativa al trigger piezo.
-- 210 campioni: timestamp esportati da 0 a 2090 ms; il trigger cade a 150 ms.
+- Finestra predefinita: da **-150 ms a +1850 ms esclusi**, relativa al trigger piezo.
+- **200 campioni XYZ / 600 valori**, coerenti con il modello corrente: timestamp
+  esportati da 0 a 1990 ms; il trigger cade a 150 ms. L'ultimo campione grezzo
+  ricampionato corrisponde quindi a +1840 ms dal trigger.
+
+Configurazione, controlli dei CSV/JSON e interpolazione sono condivisi con
+l'inferenza nel modulo `app/python/signal_processing.py`. Export e inferenza
+usano anche la stessa precisione numerica di 10 cifre significative sugli assi.
+Nella dashboard il tempo rimane relativo al trigger; cambia solo l'origine
+temporale, non i valori XYZ forniti al modello.
 
 La finestra e leggermente piu corta del grezzo (-200 ms / +2 s), per evitare
 di inventare i campioni alle estremita. I margini sono una scelta di export,
@@ -84,6 +92,10 @@ uguali per tutto il dataset e per il modello. La durata moltiplicata per la
 frequenza deve dare un numero intero di campioni. Una frequenza di export
 superiore alla minima fra media e mediana della frequenza acquisita viene
 rifiutata (tolleranza 1%): aumentarla non recupera informazioni mancanti.
+
+I lotti storici da 210 campioni non vengono modificati. Per riprodurre la loro
+finestra usare esplicitamente `--end-ms 1950`; questi CSV hanno una durata diversa
+dall'input corrente a 200 campioni e non vanno sostituiti ai suoi dati di training.
 
 ## 4. Controllare il report
 
@@ -138,4 +150,4 @@ la visualizzazione del relativo segnale in Edge Impulse.
 
 - [Formato CSV ufficiale Edge Impulse](https://docs.edgeimpulse.com/tools/specifications/data-acquisition/csv): timestamp in ms, intervalli costanti, un file per evento, prefisso etichetta.
 - [Deployment su Arduino App Lab](https://docs.edgeimpulse.com/hardware/deployments/run-arduino-app-lab).
-- [Procedura acquisizione e formato grezzo](PRIMA_ACQUISIZIONE.md).
+- [Procedura acquisizione e formato grezzo](ACQUISIZIONE_E_SENSORI.md#prima-acquisizione).

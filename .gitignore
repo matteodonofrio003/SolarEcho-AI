@@ -26,30 +26,15 @@ tmp/
 *.tmp
 *.temp
 
-# Video: conserva script e documentazione; ignora render e intermedi
+# Video: qui restano soltanto i render e gli intermedi locali.
+# Sorgenti, guide e script sono in presentation/.
 /video_output/*
 !/video_output/README.md
-!/video_output/analisi_materiali.md
-!/video_output/sceneggiatura.md
-!/video_output/storyboard.md
-!/video_output/narrazione.json
-!/video_output/sottotitoli_it.srt
-!/video_output/tools/
-/video_output/tools/*
-!/video_output/tools/*.py
-!/video_output/tools/requirements.txt
-!/video_output/analisi/
-/video_output/analisi/*
-!/video_output/analisi/basic-captions-reference.md
-!/video_output/analisi/*.json
-!/video_output/analisi/impatti/
-/video_output/analisi/impatti/*
-!/video_output/analisi/impatti/contatto-pts.json
 
 # Progetto Remotion: dipendenze e render rigenerabili
-solarecho-promo/node_modules/
-solarecho-promo/dist/
-solarecho-promo/out/
+presentation/node_modules/
+presentation/dist/
+presentation/out/
 
 # Editor e sistema operativo
 .vscode/

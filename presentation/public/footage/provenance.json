@@ -1,0 +1,43 @@
+{
+  "note": "Risorse conservate per il video di 90 secondi; contenuti identici a prima del riordino.",
+  "files": [
+    {
+      "from": "solarecho-promo/public/hackathon/dashboard.mp4",
+      "to": "presentation/public/footage/dashboard.mp4",
+      "sha256": "6930645efa7104f796da1b36568cdb58200b24d8e1fde5a30eace387502ca647"
+    },
+    {
+      "from": "solarecho-promo/public/hackathon/demo.mp4",
+      "to": "presentation/public/footage/demo.mp4",
+      "sha256": "c065a30fa1162e94e2c55f41fcb2b2801f12cf03a9d08ecdee9291171abdba27"
+    },
+    {
+      "from": "solarecho-promo/public/hackathon/electronics.jpg",
+      "to": "presentation/public/footage/electronics.jpg",
+      "sha256": "df87f431c3c273df0a02720aed58046bf27a8fab6db29a8973c5925ef1f4a6ba"
+    },
+    {
+      "from": "solarecho-promo/public/hackathon/panel.jpg",
+      "to": "presentation/public/footage/panel.jpg",
+      "sha256": "fd8eb677a680f988ef98a25b8128d884e36ac013d910b2fd1f0e88bdbe0fcd5f"
+    },
+    {
+      "from": "solarecho-promo/public/hackathon/sensor.jpg",
+      "to": "presentation/public/footage/sensor.jpg",
+      "sha256": "35de040ae5f6c6e6abdf30f4a7f94cd01ac30e2d9b3fa6ecbf0ae01e51cefbdf"
+    },
+    {
+      "from": "solarecho-promo/public/hackathon/sunlight.jpg",
+      "to": "presentation/public/footage/sunlight.jpg",
+      "sha256": "eff4683d489c4cbef9cb43a1cddcb8aa77d2162f89b9f1df5ea9ed8d905147ac"
+    }
+  ],
+  "origins": {
+    "demo.mp4": "materials/originals/VID20261011150931.mp4",
+    "dashboard.mp4": "registrazione originale dello schermo, conservata qui in singola copia",
+    "electronics.jpg": "materials/originals/IMG20261011143612.jpg",
+    "sensor.jpg": "materials/originals/IMG20261011143550.jpg",
+    "panel.jpg": "materials/originals/IMG20261011143543.jpg",
+    "sunlight.jpg": "materials/originals/IMG20261011143930.jpg"
+  }
+}

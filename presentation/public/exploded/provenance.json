@@ -1,0 +1,34 @@
+{
+  "asset": "solarecho-illustrative-v1.png",
+  "kind": "AI-generated illustrative exploded view",
+  "tool": "built-in image_gen",
+  "reference_photos": [
+    "presentation/materials/originals/IMG20261011143543.jpg",
+    "presentation/materials/originals/IMG20261011143612.jpg",
+    "presentation/materials/originals/IMG20261011143550.jpg"
+  ],
+  "represented_groups": [
+    "photovoltaic panel",
+    "3D printed support with indicator",
+    "main electronic assembly"
+  ],
+  "initial_generation_summary": "Wide 16:9 exploded product illustration guided by front, rear and side photographs of SolarEcho AI. Dark navy background, mint and warm highlights, no baked-in labels. Preserve recognizable two-section blue solar panel and black printed support; separate main electronic assembly. Illustrative geometry only.",
+  "final_edit_prompt": "Edit this exploded product illustration. Preserve exactly the black/navy background, the blue two-section solar panel on the left, black 3D printed mounting frame with its small red indicator, and the main teal electronic assembly on the upper right, their lighting, geometry, perspective, and positions. Remove BOTH small detached modules at the bottom right entirely: remove the blue board with green screw terminal and all its short wires, AND remove the motion/PIR board with the white faceted dome and all its short wires. That white dome is an incorrect invented component. Fill the removed areas cleanly with the surrounding dark navy background and subtle existing ambient lighting. Leave only THREE main exploded groups: photovoltaic panel, black frame/plate with LED, main electronic assembly. Do not add any replacement components, symbols, labels, writing or callout lines. Do not change the large parts. Maintain wide landscape proportions and excellent render quality. This is an illustrative view of the main assembly; actual sensor identities will be communicated by separate native overlay text.",
+  "notes": [
+    "The selected image is an illustration, not an engineering CAD assembly or an image of physically disassembled hardware.",
+    "The existing Solar_Housing.stl was not imported into this image generation; photographs guided the visual reference.",
+    "The initially generated unsupported optical sensor and auxiliary modules were removed before integration.",
+    "Motion and piezo sensor functions are communicated by separate native text; no generated sensor module is used as a verified component reference.",
+    "All labels are authored in Remotion, with a persistent illustrative-view notice.",
+    "Existing source photographs and exported MP4s remain unchanged.",
+    "No voiceover. Existing original procedural instrumental score, 120 BPM, is retained."
+  ],
+  "sha256": "fa56d06f48cefab741a78a0d507b26c984ca39bac73fa537e3062ad76b0661a9",
+  "width": 1672,
+  "height": 941,
+  "reference_sha256": {
+    "presentation/materials/originals/IMG20261011143543.jpg": "5760e4fbc794c05233fd486d839db26ef00154f990c24d172047a9e94fe41161",
+    "presentation/materials/originals/IMG20261011143612.jpg": "52974eec4b9467d455799190b2b15c146889e84474790781e1715284d4d42a8b",
+    "presentation/materials/originals/IMG20261011143550.jpg": "8a395279aaeb9872bf44095ccaa9aa2e0887c302a673c28495a6dfb78c3f42c1"
+  }
+}

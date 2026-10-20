@@ -95,6 +95,13 @@ e riavvio per essere aggiornati sulla scheda.
 
 ## Verifica effettuata
 
+Il refactoring del 17 ottobre 2026 aggiunge `python/event_logger.py` e
+`python/signal_processing.py` all'elenco dei file trasferiti. Il primo gestisce
+catture, salvataggio e ACK; il secondo contiene il contratto del segnale comune
+agli strumenti PC e al worker AI. Trasferire tutti i file con lo script aggiornato
+prima di Run. Questo aggiornamento non e stato trasferito o provato sulla scheda
+dall'assistente.
+
 Il 10 ottobre 2026 sono stati verificati sintassi PowerShell, anteprima `-WhatIf` e deploy USB sull'UNO Q del team. I quattro file trasferiti hanno superato il confronto SHA256 e il CLI ha riconosciuto SolarEcho-AI senza errori di configurazione. L'App e rimasta ferma, pronta per Run. Il percorso SSH e l'opzione `-Start` non sono stati eseguiti in questa verifica.
 
 ## Riferimenti

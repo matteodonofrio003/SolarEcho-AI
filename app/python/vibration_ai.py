@@ -1,5 +1,4 @@
 """Inferenza locale per impatto, con origine reale/sintetica e dati persistenti."""
-import bisect
 import copy
 import csv
 from datetime import datetime, timezone
@@ -15,11 +14,11 @@ from threading import Event, RLock, Thread
 import time
 from uuid import uuid4
 
+from signal_processing import END_MS, RATE_HZ, SAMPLE_COUNT, START_MS, read_capture, resample
+
 
 MODEL_ID = "ei-model-1136239-1"
 PROJECT_ID = 1136239
-RATE_HZ, SAMPLE_COUNT = 100, 200
-START_US, END_US, MAX_GAP_US = -150_000, 1_850_000, 30_000
 RESULT_ID = re.compile(r"[0-9a-f]{32}")
 # Da configurare con il valore usato in Edge Impulse, non scelto dai sintetici.
 DEFAULT_THRESHOLD = None
@@ -32,69 +31,16 @@ def utc_now():
 
 
 def prepare_capture(path):
-    """Stessa griglia e interpolazione dell'export; nessun offset tolto all'input AI."""
+    """Usa gli stessi controlli, griglia e precisione dell'export Edge Impulse."""
     path = Path(path)
-    metadata_path = path.with_suffix(".json")
-    if metadata_path.resolve().parent != path.resolve().parent:
-        raise ValueError("Metadati fuori dalla cartella di acquisizione")
-    if path.stat().st_size > 4_000_000 or metadata_path.stat().st_size > 64_000:
-        raise ValueError("Acquisizione troppo grande")
-    meta = json.loads(metadata_path.read_text(encoding="utf-8"))
-    if not isinstance(meta, dict):
-        raise ValueError("Metadati non validi")
-    if (meta.get("capture_complete") is not True or meta.get("transport_complete") is not True
-            or meta.get("overflow") is not False or meta.get("timed_out") is not False
-            or meta.get("additional_events") != 0):
-        raise ValueError("Cattura incompleta o con ulteriori impatti")
-    with path.open(newline="", encoding="utf-8") as stream:
-        rows = list(csv.DictReader(stream))
-    if not 10 <= len(rows) <= 512 or any(meta.get(k) != len(rows)
-            for k in ("expected_samples", "received_samples", "declared_samples")):
-        raise ValueError("Conteggio campioni incoerente")
-    times, axes = [], []
-    for index, row in enumerate(rows):
-        if (None in row or any(v is None for v in row.values())
-                or int(row["sample_index"]) != index
-                or row["session_id"] != meta["session_id"]
-                or int(row["event_id"]) != meta["event_id"]
-                or row["capture_complete"].lower() != "true"
-                or row["trigger_source"] != "piezo_analog"):
-            raise ValueError("Riga CSV incoerente")
-        times.append(int(row["timestamp_us"]))
-        axes.append(tuple(float(row[k]) for k in ("ax_g", "ay_g", "az_g")))
-    if not all(math.isfinite(v) for sample in axes for v in sample):
-        raise ValueError("Accelerazione non finita")
-    gaps = [b-a for a,b in zip(times, times[1:])]
-    if min(gaps) <= 0 or max(gaps) > MAX_GAP_US:
-        raise ValueError("Timestamp irregolari o buco IMU oltre 30 ms")
-    if RATE_HZ > min(1_000_000/statistics.mean(gaps),
-                     1_000_000/statistics.median(gaps))*1.01:
-        raise ValueError("Campionamento insufficiente per l'input a 100 Hz")
-    if (sum(t < 0 for t in times) != meta["pretrigger_samples"]
-            or times[0] < -meta["pretrigger_us"]
-            or times[0] > -meta["pretrigger_us"] + MAX_GAP_US
-            or times[-1] >= meta["posttrigger_us"]
-            or times[-1] < meta["posttrigger_us"]-MAX_GAP_US):
-        raise ValueError("Copertura pre/posttrigger incoerente")
-    if any(not -meta["pretrigger_us"] <= t < meta["posttrigger_us"] for t in times):
-        raise ValueError("Timestamp fuori cattura")
-    last = START_US+(SAMPLE_COUNT-1)*10_000
-    if times[0] > START_US or times[-1] < last:
-        raise ValueError("Il segnale non copre la finestra AI; nessuna estrapolazione")
-    samples = []
-    for index in range(SAMPLE_COUNT):
-        target = START_US+index*10_000
-        right = bisect.bisect_left(times, target)
-        if times[right] == target:
-            values = axes[right]
-        else:
-            left = right-1
-            weight = (target-times[left])/(times[right]-times[left])
-            values = tuple(a+weight*(b-a) for a,b in zip(axes[left], axes[right]))
-        # Riproduce anche la precisione decimale del CSV esportato per il training.
-        samples.append([target/1000, *(float(f"{v:.10g}") for v in values)])
-    return samples, {"raw_samples": len(rows), "mean_rate_hz": 1_000_000/statistics.mean(gaps),
-                     "max_gap_us": max(gaps), "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+    times, axes, _, quality = read_capture(path)
+    exported = resample(times, axes)
+    # Solo il riferimento temporale cambia: i 600 valori XYZ restano identici.
+    samples = [[stamp + START_MS, x, y, z] for stamp, x, y, z in exported]
+    return samples, {"raw_samples": quality["raw_samples"],
+                     "mean_rate_hz": quality["mean_sample_rate_hz"],
+                     "max_gap_us": quality["max_imu_gap_us"],
+                     "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
 def stress_samples(samples):
@@ -273,8 +219,8 @@ class VibrationAI:
         decision = "UNCALIBRATED" if threshold is None else "ANOMALY" if score >= threshold else "NORMAL"
         job.update(state="DONE", score=score, decision=decision, inference_ms=latency,
                    quality=quality, diagnostics=diagnostics(samples), samples=samples,
-                   frequency_hz=RATE_HZ, units="g", window_start_ms=-150,
-                   window_end_ms_exclusive=1850, transform=dict(STRESS) if job["synthetic"] else None)
+                   frequency_hz=RATE_HZ, units="g", window_start_ms=START_MS,
+                   window_end_ms_exclusive=END_MS, transform=dict(STRESS) if job["synthetic"] else None)
         if job["synthetic"]:
             job["original_samples"] = original
             # Confronto misurato sulla stessa cattura e sullo stesso runner.

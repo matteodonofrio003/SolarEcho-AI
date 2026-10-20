@@ -307,8 +307,8 @@ L'MVP e pronto per una demo quando tutte le condizioni seguenti sono soddisfatte
 
 ## 17. Riferimenti
 
-- `docs/UM.md` - Riferimento al manuale ufficiale Arduino UNO Q e risorse locali.
-- `docs/ABX00162-ABX00173-it-datasheet.pdf` - Datasheet locale Arduino UNO Q.
-- `docs/ABX00162-full-pinout.pdf` - Pinout locale Arduino UNO Q.
+- [Manuale ufficiale UNO Q](https://docs.arduino.cc/tutorials/uno-q/user-manual/) - Riferimento al manuale ufficiale Arduino UNO Q e risorse locali.
+- `docs/hardware/datasheets/ABX00162-ABX00173-it-datasheet.pdf` - Datasheet locale Arduino UNO Q.
+- `docs/hardware/datasheets/ABX00162-full-pinout.pdf` - Pinout locale Arduino UNO Q.
 - [Indice dei componenti e della documentazione scaricata](COMPONENTI.md), inclusi Modulino Movement e Grove Piezo Vibration Sensor identificato dal link dell'inventario.
-- [Procedura della prima acquisizione](PRIMA_ACQUISIZIONE.md).
+- [Procedura della prima acquisizione](ACQUISIZIONE_E_SENSORI.md#prima-acquisizione).
